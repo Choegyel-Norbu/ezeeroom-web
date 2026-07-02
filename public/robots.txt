@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow only sensitive/admin paths (if any exist)
+# Disallow: /admin/
+# Disallow: /api/
+
+# Sitemap location
+Sitemap: https://www.ezeeroom.bt/sitemap.xml

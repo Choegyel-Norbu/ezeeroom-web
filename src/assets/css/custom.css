@@ -1,0 +1,35 @@
+.bg-custom-background {
+  background-color: var(--color-background);
+}
+
+.text-custom-primary {
+  color: var(--color-primary);
+}
+.nav-btn {
+  border: 1px solid #050203;
+  border-radius: 30px;
+  padding: 0.5rem 1rem;
+}
+
+/* Custom animations for Explore Now button */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}

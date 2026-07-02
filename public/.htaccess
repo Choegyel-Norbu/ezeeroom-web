@@ -1,0 +1,50 @@
+# Apache configuration for proper MIME types
+<Files "sitemap.xml">
+    Header set Content-Type "application/xml; charset=utf-8"
+</Files>
+
+<Files "robots.txt">
+    Header set Content-Type "text/plain; charset=utf-8"
+</Files>
+
+# Enable compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+</IfModule>
+
+# Cache static files
+<IfModule mod_expires.c>
+    ExpiresActive on
+    ExpiresByType text/xml "access plus 1 day"
+    ExpiresByType application/xml "access plus 1 day"
+    ExpiresByType text/plain "access plus 1 day"
+</IfModule>
+
+# HTTP Strict Transport Security (HSTS)
+# Forces browsers to use HTTPS connections for 1 year
+# includeSubDomains applies HSTS to all subdomains
+# preload allows inclusion in browser preload lists (requires submission to hstspreload.org)
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    
+    # Referrer Policy
+    # Maximum privacy: Never sends referrer header for any requests (same-origin or cross-origin)
+    # Completely prevents referrer leakage, including internal analytics
+    # Note: This may break OAuth flows that require referrer information
+    Header always set Referrer-Policy "no-referrer"
+    
+    # Content Security Policy (CSP)
+    # Protects against XSS, code injection, and malicious script execution
+    # Allows: Same-origin resources, Firebase, backend API, UploadThing, payment gateways
+    # Restricts: Inline scripts (except JSON-LD), eval(), and unsafe operations
+    # frame-src and child-src are required for Firebase OAuth popups on mobile devices
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.firebaseapp.com https://*.googleapis.com https://apis.google.com https://www.googleapis.com https://*.gstatic.com https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.firebaseapp.com https://*.googleapis.com https://apis.google.com https://www.googleapis.com https://*.gstatic.com https://www.gstatic.com https://accounts.google.com https://ezeeroom-production.up.railway.app https://utfs.io https:; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; manifest-src 'self'; form-action 'self' https:; frame-src 'self' https://*.firebaseapp.com https://*.googleapis.com https://apis.google.com https://www.googleapis.com https://accounts.google.com https://*.google.com; child-src 'self' https://*.firebaseapp.com https://*.googleapis.com https://apis.google.com https://www.googleapis.com https://accounts.google.com https://*.google.com; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests;"
+</IfModule>

@@ -1,0 +1,13 @@
+services:
+  ezeeroom-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ezeeroom-web
+    ports:
+      - "3000:80"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

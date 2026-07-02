@@ -1,0 +1,101 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production build
+/build
+/dist
+*.min.js
+*.min.css
+
+# Environment variables (CRITICAL: Never commit these!)
+.env
+.env.*
+*.env
+
+# API Keys and Secrets (CRITICAL: Never commit these!)
+**/secrets/
+**/keys/
+**/*secret*
+**/*credentials*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Misc
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vercel
+.netlify/
+
+# PWA
+workbox-*.js
+sw.js
+service-worker.js
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Security
+security-report-*.json
+security-scan-*.txt
+SECURITY-ISSUES.md
+
+### Kept local, not tracked (cleanup) ###
+.code-review-graph/
+.cursor/
+.agent/
+docs/
+*.sh
+FIREBASE_CUSTOM_DOMAIN_TROUBLESHOOTING.md
+
+### Not needed for app build/run (kept local, not tracked) ###
+api-endpoints-authorization.json
+security-analysis.json
+vercel.json
+.github/
+scripts/
+
+### Lockfile (untracked) ###
+package-lock.json
