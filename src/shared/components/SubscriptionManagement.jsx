@@ -118,7 +118,7 @@ const SubscriptionManagement = () => {
     try {
       const paymentData = {
         subscriptionPlan: 'PRO',
-        amount: 999.00,
+        amount: 1999.00,
         notes: 'Monthly subscription payment'
       };
 

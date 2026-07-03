@@ -54,7 +54,7 @@ const ProUpgradeDialog = ({ open, onOpenChange }) => {
 
           {/* Price row */}
           <div className="flex items-baseline gap-1.5 bg-neutral-50 border border-neutral-200 rounded-md px-3.5 py-3 mb-5">
-            <span className="text-[22px] font-bold tracking-tighter text-neutral-950 tabular-nums">Nu. 999</span>
+            <span className="text-[22px] font-bold tracking-tighter text-neutral-950 tabular-nums">Nu. 1999</span>
             <span className="text-[13px] font-medium text-neutral-500">/ month</span>
             <span className="text-[12px] text-neutral-400 ml-auto tabular-nums">billed monthly</span>
           </div>

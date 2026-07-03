@@ -29,8 +29,8 @@ export const SUBSCRIPTION_PLANS = {
   BASIC: {
     id: 'BASIC',
     name: 'Basic',
-    price: 499,
-    annualPrice: 4990,
+    price: 999,
+    annualPrice: 9990,
     currency: 'Nu.',
     duration: 1, // month
     maxRooms: 10,
@@ -40,7 +40,7 @@ export const SUBSCRIPTION_PLANS = {
       { label: 'Booking calendar & availability', included: true },
       { label: 'Room management', included: true },
       { label: 'Admin & time-based booking', included: true },
-      { label: 'QR check-in & CID verification', included: true },
+      { label: 'Passcode check-in & CID verification', included: true },
       { label: 'Up to 2 staff accounts', included: true },
       { label: 'Up to 10 rooms', included: true },
       { label: 'Hotel listing & profile', included: true },
@@ -53,8 +53,8 @@ export const SUBSCRIPTION_PLANS = {
   PRO: {
     id: 'PRO',
     name: 'Pro',
-    price: 999,
-    annualPrice: 8990,
+    price: 1999,
+    annualPrice: 19990,
     currency: 'Nu.',
     duration: 1, // month
     // Features shown on the Pro card. All included.

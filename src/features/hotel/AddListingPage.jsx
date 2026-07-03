@@ -21,7 +21,9 @@ import {
   Navigation,
   AlertCircle,
   Lock,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Spinner } from "@/components/ui/ios-spinner";
 
@@ -81,11 +83,23 @@ const AddListingPage = () => {
     accountNumber: "",
     accountHolderName: "",
     bankType: "",
+    hasRestaurant: false,
+    zhimpuRestaurant: {
+      restaurantName: "",
+      licenseNo: "",
+      address: "",
+      tpn: "",
+      username: "",
+      email: "",
+      password: "",
+      phoneNumber: "",
+    },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
   const [policySelectionType, setPolicySelectionType] = useState("");
+  const [showZhimpuPassword, setShowZhimpuPassword] = useState(false);
 
   const [locationState, setLocationState] = useState({
     isGettingLocation: false,
@@ -474,6 +488,38 @@ const AddListingPage = () => {
     }
   };
 
+  const handleZhimpuRestaurantChange = (e) => {
+    const { name, value } = e.target;
+    const errorKey = `zhimpuRestaurant.${name}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
+      });
+    }
+    setFormData((prev) => ({
+      ...prev,
+      zhimpuRestaurant: { ...prev.zhimpuRestaurant, [name]: value },
+    }));
+  };
+
+  const handleHasRestaurantToggle = (checked) => {
+    setFormData((prev) => ({
+      ...prev,
+      hasRestaurant: checked,
+      zhimpuRestaurant: checked
+        ? {
+            ...prev.zhimpuRestaurant,
+            restaurantName: prev.zhimpuRestaurant.restaurantName || prev.name,
+            address: prev.zhimpuRestaurant.address || prev.address,
+            phoneNumber: prev.zhimpuRestaurant.phoneNumber || prev.phone,
+            email: prev.zhimpuRestaurant.email || email || "",
+          }
+        : prev.zhimpuRestaurant,
+    }));
+  };
+
   const handleCoordinateChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -516,6 +562,25 @@ const AddListingPage = () => {
           newErrors.cancellationPolicy = policySelectionType === "predefined"
             ? "Please select a cancellation policy"
             : "Please write your cancellation policy";
+        }
+
+        if (formData.hasRestaurant) {
+          const r = formData.zhimpuRestaurant;
+          if (!r.restaurantName) newErrors["zhimpuRestaurant.restaurantName"] = "Restaurant name is required";
+          if (!r.licenseNo) newErrors["zhimpuRestaurant.licenseNo"] = "Restaurant license number is required";
+          if (!r.address) newErrors["zhimpuRestaurant.address"] = "Restaurant address is required";
+          if (!r.username) newErrors["zhimpuRestaurant.username"] = "Username is required";
+          if (!r.email) {
+            newErrors["zhimpuRestaurant.email"] = "Email is required";
+          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) {
+            newErrors["zhimpuRestaurant.email"] = "Enter a valid email address";
+          }
+          if (!r.password) {
+            newErrors["zhimpuRestaurant.password"] = "Password is required";
+          } else if (r.password.length < 8) {
+            newErrors["zhimpuRestaurant.password"] = "Password must be at least 8 characters";
+          }
+          if (!r.phoneNumber) newErrors["zhimpuRestaurant.phoneNumber"] = "Phone number is required";
         }
       }
 
@@ -804,7 +869,7 @@ const AddListingPage = () => {
 
           {/* Price row */}
           <div className="flex items-baseline gap-1.5 bg-neutral-50 border border-neutral-200 rounded-md px-3.5 py-3 mb-6">
-            <span className="text-[22px] font-bold tracking-tighter text-neutral-950 tabular-nums">Nu. 999</span>
+            <span className="text-[22px] font-bold tracking-tighter text-neutral-950 tabular-nums">Nu. 1999</span>
             <span className="text-[13px] font-medium text-neutral-500">/ month</span>
             <span className="text-[12px] text-neutral-400 ml-auto tabular-nums">billed monthly</span>
           </div>
@@ -1285,6 +1350,197 @@ const AddListingPage = () => {
                             <li>• Ideal for short stays, meetings, or day use</li>
                             <li>• Can be used alongside regular daily bookings</li>
                           </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Restaurant registration (Zhimpu) */}
+                <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                  <SectionHeader title="Restaurant" subtitle="Register a restaurant attached to this hotel with Zhimpu" />
+                  <div className="p-5 space-y-4">
+                    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="hasRestaurant"
+                          className="mt-0.5 h-4 w-4"
+                          checked={formData.hasRestaurant}
+                          onCheckedChange={handleHasRestaurantToggle}
+                        />
+                        <div>
+                          <label htmlFor="hasRestaurant" className="text-[13px] font-medium text-neutral-900 cursor-pointer">
+                            Do you have a restaurant?
+                          </label>
+                          <p className="text-[12px] text-neutral-500 mt-0.5">
+                            We'll register it with Zhimpu so it can be managed alongside your hotel.
+                          </p>
+                        </div>
+                      </div>
+
+                      {formData.hasRestaurant && (
+                        <div className="ml-7 bg-white rounded-md px-4 py-4 border border-neutral-200 space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="zhimpuRestaurant.restaurantName" className="text-[12px] font-medium text-neutral-700">
+                              Restaurant Name <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="zhimpuRestaurant.restaurantName"
+                              name="restaurantName"
+                              value={formData.zhimpuRestaurant.restaurantName}
+                              onChange={handleZhimpuRestaurantChange}
+                              placeholder="Enter the restaurant's name"
+                              className={errors["zhimpuRestaurant.restaurantName"] ? "border-red-400" : ""}
+                            />
+                            {errors["zhimpuRestaurant.restaurantName"] && (
+                              <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.restaurantName"]}</p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="zhimpuRestaurant.licenseNo" className="text-[12px] font-medium text-neutral-700">
+                              License Number <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="zhimpuRestaurant.licenseNo"
+                              name="licenseNo"
+                              value={formData.zhimpuRestaurant.licenseNo}
+                              onChange={handleZhimpuRestaurantChange}
+                              placeholder="e.g., BT-12345"
+                              className={errors["zhimpuRestaurant.licenseNo"] ? "border-red-400" : ""}
+                            />
+                            {errors["zhimpuRestaurant.licenseNo"] && (
+                              <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.licenseNo"]}</p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="zhimpuRestaurant.address" className="text-[12px] font-medium text-neutral-700">
+                              Address <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id="zhimpuRestaurant.address"
+                              name="address"
+                              value={formData.zhimpuRestaurant.address}
+                              onChange={handleZhimpuRestaurantChange}
+                              placeholder="Restaurant address"
+                              className={errors["zhimpuRestaurant.address"] ? "border-red-400" : ""}
+                            />
+                            {errors["zhimpuRestaurant.address"] && (
+                              <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.address"]}</p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="zhimpuRestaurant.tpn" className="text-[12px] font-medium text-neutral-700">
+                              TPN <span className="text-neutral-400 text-[11px] font-normal">(Optional)</span>
+                            </Label>
+                            <Input
+                              id="zhimpuRestaurant.tpn"
+                              name="tpn"
+                              value={formData.zhimpuRestaurant.tpn}
+                              onChange={handleZhimpuRestaurantChange}
+                              placeholder="Tax Payer Number, if any"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="zhimpuRestaurant.username" className="text-[12px] font-medium text-neutral-700">
+                                Username <span className="text-red-500">*</span>
+                              </Label>
+                              <Input
+                                id="zhimpuRestaurant.username"
+                                name="username"
+                                value={formData.zhimpuRestaurant.username}
+                                onChange={handleZhimpuRestaurantChange}
+                                placeholder="Login username for Zhimpu"
+                                autoComplete="off"
+                                className={errors["zhimpuRestaurant.username"] ? "border-red-400" : ""}
+                              />
+                              {errors["zhimpuRestaurant.username"] && (
+                                <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.username"]}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="zhimpuRestaurant.password" className="text-[12px] font-medium text-neutral-700">
+                                Password <span className="text-red-500">*</span>
+                              </Label>
+                              <div className="relative">
+                                <Input
+                                  id="zhimpuRestaurant.password"
+                                  name="password"
+                                  type={showZhimpuPassword ? "text" : "password"}
+                                  value={formData.zhimpuRestaurant.password}
+                                  onChange={handleZhimpuRestaurantChange}
+                                  placeholder="At least 8 characters"
+                                  autoComplete="new-password"
+                                  className={`pr-9 ${errors["zhimpuRestaurant.password"] ? "border-red-400" : ""}`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowZhimpuPassword((prev) => !prev)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                                  aria-label={showZhimpuPassword ? "Hide password" : "Show password"}
+                                  tabIndex={-1}
+                                >
+                                  {showZhimpuPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                </button>
+                              </div>
+                              {errors["zhimpuRestaurant.password"] && (
+                                <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.password"]}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="zhimpuRestaurant.email" className="text-[12px] font-medium text-neutral-700">
+                                Email <span className="text-red-500">*</span>
+                              </Label>
+                              <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                                <Input
+                                  id="zhimpuRestaurant.email"
+                                  name="email"
+                                  type="email"
+                                  value={formData.zhimpuRestaurant.email}
+                                  onChange={handleZhimpuRestaurantChange}
+                                  placeholder="admin@example.bt"
+                                  className={`pl-9 ${errors["zhimpuRestaurant.email"] ? "border-red-400" : ""}`}
+                                />
+                              </div>
+                              {errors["zhimpuRestaurant.email"] && (
+                                <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.email"]}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="zhimpuRestaurant.phoneNumber" className="text-[12px] font-medium text-neutral-700">
+                                Phone Number <span className="text-red-500">*</span>
+                              </Label>
+                              <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                                <Input
+                                  id="zhimpuRestaurant.phoneNumber"
+                                  name="phoneNumber"
+                                  type="tel"
+                                  value={formData.zhimpuRestaurant.phoneNumber}
+                                  onChange={handleZhimpuRestaurantChange}
+                                  placeholder="17123456"
+                                  className={`pl-9 ${errors["zhimpuRestaurant.phoneNumber"] ? "border-red-400" : ""}`}
+                                />
+                              </div>
+                              {errors["zhimpuRestaurant.phoneNumber"] && (
+                                <p className="text-red-500 text-[12px]">{errors["zhimpuRestaurant.phoneNumber"]}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-[12px] text-neutral-400">
+                            We register your restaurant with Zhimpu first — your hotel listing is only created after that succeeds.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1809,6 +2065,23 @@ const AddListingPage = () => {
                 )}
               </div>
             </div>
+
+            {formData.hasRestaurant && (
+              <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                <SectionHeader title="Restaurant (Zhimpu)" />
+                <div className="p-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                    <ReviewField label="Restaurant Name" value={formData.zhimpuRestaurant.restaurantName} />
+                    <ReviewField label="License Number" value={formData.zhimpuRestaurant.licenseNo} />
+                    <ReviewField label="Address" value={formData.zhimpuRestaurant.address} />
+                    {formData.zhimpuRestaurant.tpn && <ReviewField label="TPN" value={formData.zhimpuRestaurant.tpn} />}
+                    <ReviewField label="Username" value={formData.zhimpuRestaurant.username} />
+                    <ReviewField label="Email" value={formData.zhimpuRestaurant.email} />
+                    <ReviewField label="Phone" value={formData.zhimpuRestaurant.phoneNumber} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Verification documents */}
             <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">

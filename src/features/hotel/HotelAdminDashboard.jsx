@@ -17,6 +17,7 @@ import {
   CreditCard,
   CheckCircle,
   Settings,
+  UtensilsCrossed,
   Lock,
   Clock,
   User,
@@ -790,9 +791,20 @@ const HotelAdminDashboard = () => {
     ...(subscriptionPlan !== 'BASIC' ? [{ id: "leave", label: "Leave Management", icon: Clock, locked: true }] : []),
     ...(roles && !roles.includes("FRONTDESK") && !roles.includes("STAFF") ? [
       { id: "billing", label: "Billing", icon: FileText, locked: false },
+      ...(hotel?.hasRestaurant ? [{ id: "restaurant", label: "Restaurant", icon: UtensilsCrossed, locked: false }] : []),
       { id: "hotel", label: "Hotel Settings", icon: Settings, locked: true }
     ] : [])
   ];
+
+  const handleNavItemClick = (item) => {
+    if (item.id === "restaurant") {
+      const email = hotel?.restaurantEmail;
+      const loginUrl = `https://zhimpu.dcpl.bt/login${email ? `?email=${encodeURIComponent(email)}` : ""}`;
+      window.open(loginUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setActiveTab(item.id);
+  };
 
   const getPageTitle = () => {
     const titles = {
@@ -923,7 +935,7 @@ const HotelAdminDashboard = () => {
                 key={item.id}
                 item={item}
                 isActive={activeTab === item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleNavItemClick(item)}
               />
             ))}
           </div>
@@ -1153,7 +1165,7 @@ const HotelAdminDashboard = () => {
                           item={item}
                           isActive={activeTab === item.id}
                           onClick={() => {
-                            setActiveTab(item.id);
+                            handleNavItemClick(item);
                             setMobileMenuOpen(false);
                           }}
                         />
