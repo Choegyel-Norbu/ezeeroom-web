@@ -1356,7 +1356,8 @@ const AddListingPage = () => {
                   </div>
                 </div>
 
-                {/* Restaurant registration (Zhimpu) */}
+                {/* Restaurant registration (Zhimpu) - temporarily disabled for production */}
+                {false && (
                 <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
                   <SectionHeader title="Restaurant" subtitle="Register a restaurant attached to this hotel with Zhimpu" />
                   <div className="p-5 space-y-4">
@@ -1546,6 +1547,7 @@ const AddListingPage = () => {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Cancellation Policy */}
                 <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
