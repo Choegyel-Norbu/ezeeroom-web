@@ -62,7 +62,9 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
   const formatCurrency = (amount) => {
     const currency = receiptData.currency || 'BTN';
     const symbol = currency === 'BTN' ? 'Nu.' : currency;
-    return `${symbol} ${parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const value = parseFloat(amount || 0);
+    const sign = value < 0 ? '-' : '';
+    return `${sign}${symbol} ${Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Helper: format date (e.g., "19th Jul, 2022")
@@ -192,9 +194,8 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
   // ── Items table ──────────────────────────────────────────────────────────────
   // Column anchors: item is left-aligned; numeric columns are right-aligned.
   const itemX = margin + 4;
-  const qtyR = margin + 96;
-  const unitR = margin + 128;
-  const discR = margin + 150;
+  const qtyR = margin + 112;
+  const unitR = margin + 142;
   const amtR = contentRight - 4;
 
   // Header row
@@ -207,7 +208,6 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
   doc.text('ITEM', itemX, headerTextY);
   doc.text('QTY', qtyR, headerTextY, { align: 'right' });
   doc.text('UNIT PRICE', unitR, headerTextY, { align: 'right' });
-  doc.text('DISCOUNT', discR, headerTextY, { align: 'right' });
   doc.text('AMOUNT', amtR, headerTextY, { align: 'right' });
   yPosition += 10;
 
@@ -217,18 +217,28 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
   const itemDescription = receiptData.description || (isBooking ? 'Booking Payment' : 'Subscription Payment');
   const gstAmount = parseFloat(receiptData.gstAmount || 0);
   const serviceTaxAmount = parseFloat(receiptData.serviceTaxAmount || 0);
-  const hasTaxBreakdown = isBooking && receiptData.baseAmount != null && (gstAmount > 0 || serviceTaxAmount > 0);
+  const walkInServiceChargeAmount = parseFloat(receiptData.walkInServiceChargeAmount || 0);
+  const discountAmount = parseFloat(receiptData.discountAmount || 0);
+  const hasTaxBreakdown = isBooking && receiptData.baseAmount != null &&
+    (gstAmount > 0 || serviceTaxAmount > 0 || walkInServiceChargeAmount > 0 || discountAmount > 0);
 
   const lineItems = hasTaxBreakdown
     ? [
         { label: itemDescription, amount: receiptData.baseAmount },
-        // gstRate/serviceTaxRate are stored as fractions (e.g. 0.05), so convert to a
-        // whole percentage for display (Math.round avoids float artifacts like 0.03 * 100 = 3.0000000000000004).
+        // gstRate/serviceTaxRate/walkInServiceChargeRate are stored as fractions (e.g. 0.05),
+        // so convert to a whole percentage for display (Math.round avoids float artifacts
+        // like 0.03 * 100 = 3.0000000000000004).
+        ...(walkInServiceChargeAmount > 0
+          ? [{ label: `Service Charge${receiptData.walkInServiceChargeRate ? ` (${Math.round(parseFloat(receiptData.walkInServiceChargeRate) * 100)}%)` : ''}`, amount: walkInServiceChargeAmount }]
+          : []),
         ...(gstAmount > 0
           ? [{ label: `GST${receiptData.gstRate ? ` (${Math.round(parseFloat(receiptData.gstRate) * 100)}%)` : ''}`, amount: gstAmount }]
           : []),
         ...(serviceTaxAmount > 0
           ? [{ label: `Service Tax${receiptData.serviceTaxRate ? ` (${Math.round(parseFloat(receiptData.serviceTaxRate) * 100)}%)` : ''}`, amount: serviceTaxAmount }]
+          : []),
+        ...(discountAmount > 0
+          ? [{ label: 'Discount', amount: -discountAmount }]
           : []),
       ]
     : [{ label: itemDescription, amount: totalPaidAmount }];
@@ -243,7 +253,6 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
     doc.text(itemLines, itemX, rowTextY);
     doc.text('1', qtyR, rowTextY, { align: 'right' });
     doc.text(formatCurrency(item.amount), unitR, rowTextY, { align: 'right' });
-    doc.text('0%', discR, rowTextY, { align: 'right' });
     doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(item.amount), amtR, rowTextY, { align: 'right' });
     yPosition += rowH;

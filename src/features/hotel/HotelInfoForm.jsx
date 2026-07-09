@@ -45,8 +45,6 @@ const formSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   cancellationPolicy: z.string().min(1, "Cancellation policy is required"),
-  hasTimeBased: z.boolean().optional(),
-  gst: z.boolean().optional(),
   checkInTime: z.string().min(1, "Check-in time is required"),
   checkOutTime: z.string().min(1, "Check-out time is required"),
   facebookUrl: z.string().url("Please enter a valid Facebook URL").optional().or(z.literal("")),
@@ -190,8 +188,6 @@ const HotelInfoForm = ({ hotel, onUpdate }) => {
       latitude: hotel.latitude ? parseFloat(hotel.latitude) : undefined,
       longitude: hotel.longitude ? parseFloat(hotel.longitude) : undefined,
       cancellationPolicy: hotel.cancellationPolicy || "",
-      hasTimeBased: hotel.hasTimeBased || false,
-      gst: hotel.gst || false,
       checkInTime: hotel.checkinTime || "01:00:00",
       checkOutTime: hotel.checkoutTime || "13:00:00",
       facebookUrl: hotel.facebookUrl || "",
@@ -221,8 +217,6 @@ const HotelInfoForm = ({ hotel, onUpdate }) => {
       latitude: hotel.latitude ? parseFloat(hotel.latitude) : undefined,
       longitude: hotel.longitude ? parseFloat(hotel.longitude) : undefined,
       cancellationPolicy: hotel.cancellationPolicy || "",
-      hasTimeBased: hotel.hasTimeBased || false,
-      gst: hotel.gst || false,
       checkInTime: hotel.checkinTime || "01:00:00",
       checkOutTime: hotel.checkoutTime || "01:00:00",
       facebookUrl: hotel.facebookUrl || "",
@@ -344,8 +338,6 @@ const HotelInfoForm = ({ hotel, onUpdate }) => {
       latitude: hotel.latitude ? parseFloat(hotel.latitude) : undefined,
       longitude: hotel.longitude ? parseFloat(hotel.longitude) : undefined,
       cancellationPolicy: hotel.cancellationPolicy || "",
-      hasTimeBased: hotel.hasTimeBased || false,
-      gst: hotel.gst || false,
       checkInTime: hotel.checkinTime || "14:00",
       checkOutTime: hotel.checkoutTime || "11:00",
       facebookUrl: hotel.facebookUrl || "",
@@ -388,8 +380,6 @@ const HotelInfoForm = ({ hotel, onUpdate }) => {
         accountNumber: values.accountNumber || null,
         accountHolderName: values.accountHolderName || null,
         bankType: values.bankType || null,
-        hasTimeBased: values.hasTimeBased || false,
-        gst: values.gst || false,
       };
       const res = await api.put(`/hotels/${formData.id}`, updateData);
       if (res.status === 200) {
@@ -1014,75 +1004,6 @@ const HotelInfoForm = ({ hotel, onUpdate }) => {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Booking Options */}
-          <SectionDivider label="Booking Options" />
-          {!isEditing ? (
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-md">
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${hotel.hasTimeBased ? 'bg-emerald-100' : 'bg-neutral-100'}`}>
-                <Clock className={`h-3.5 w-3.5 ${hotel.hasTimeBased ? 'text-emerald-600' : 'text-neutral-400'}`} />
-              </div>
-              <div>
-                <p className="text-[13px] font-medium text-neutral-950">Hourly Booking</p>
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${hotel.hasTimeBased ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-neutral-50 text-neutral-500 border-neutral-200'}`}>
-                  {hotel.hasTimeBased ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <FormField control={form.control} name="hasTimeBased" render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-md border border-neutral-200 p-4">
-                  <div>
-                    <p className="text-[13px] font-medium text-neutral-950">Enable Hourly Booking</p>
-                    <p className="text-[12px] text-neutral-500 mt-0.5">Allow guests to book rooms for specific hours instead of full days</p>
-                  </div>
-                  <FormControl>
-                    <input type="checkbox" checked={field.value} onChange={field.onChange} className="h-4 w-4 accent-neutral-950 flex-shrink-0" />
-                  </FormControl>
-                </FormItem>
-              )} />
-              {form.watch("hasTimeBased") && (
-                <div className="flex items-start gap-3 border-l-2 border-l-neutral-950 border border-neutral-200 bg-white px-4 py-3 rounded-r-md">
-                  <ul className="text-[12px] text-neutral-500 space-y-0.5">
-                    <li>Guests can book rooms for specific hours (1–24 hours)</li>
-                    <li>Flexible check-in and check-out times</li>
-                    <li>Ideal for short stays, meetings, or day use</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* GST */}
-          <SectionDivider label="Tax Settings" />
-          {!isEditing ? (
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-md">
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${hotel.gst ? 'bg-emerald-100' : 'bg-neutral-100'}`}>
-                <span className={`text-[11px] font-bold ${hotel.gst ? 'text-emerald-600' : 'text-neutral-400'}`}>5%</span>
-              </div>
-              <div>
-                <p className="text-[13px] font-medium text-neutral-950">GST (5%)</p>
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${hotel.gst ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-neutral-50 text-neutral-500 border-neutral-200'}`}>
-                  {hotel.gst ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <FormField control={form.control} name="gst" render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-md border border-neutral-200 p-4">
-                  <div>
-                    <p className="text-[13px] font-medium text-neutral-950">Enable GST (5%)</p>
-                    <p className="text-[12px] text-neutral-500 mt-0.5">Apply 5% GST on the base booking price. Shown as a separate line item on the booking card.</p>
-                  </div>
-                  <FormControl>
-                    <input type="checkbox" checked={field.value} onChange={field.onChange} className="h-4 w-4 accent-neutral-950 flex-shrink-0" />
-                  </FormControl>
-                </FormItem>
-              )} />
             </div>
           )}
 

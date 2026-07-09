@@ -18,6 +18,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     numberOfRooms: 1,
     phone: "",
     cid: "",
+    passportNumber: "",
     destination: "",
     origin: "",
     isBhutanese: true,
@@ -211,7 +212,25 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     if (/^(\d)\1{10}$/.test(trimmedCid)) {
       return "CID number cannot be all same digits";
     }
-    
+
+    return null;
+  }, []);
+
+  // Validate Passport Number (only required for non-Bhutanese guests)
+  const validatePassportNumber = useCallback((passportNumber) => {
+    if (!passportNumber.trim()) {
+      return "Passport number is required for non-Bhutanese guests";
+    }
+
+    const trimmed = passportNumber.trim();
+    if (!/^[A-Za-z0-9]{5,20}$/.test(trimmed)) {
+      return "Passport number must be 5-20 letters/digits";
+    }
+
+    if (/^([A-Za-z0-9])\1+$/.test(trimmed)) {
+      return "Passport number cannot be all the same character";
+    }
+
     return null;
   }, []);
 
@@ -253,10 +272,14 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
   const validateForm = useCallback(() => {
     const newErrors = {};
 
-    // Validate CID Number (only required for Bhutanese citizens)
+    // Validate CID Number (only required for Bhutanese citizens) or Passport
+    // Number (only required for non-Bhutanese guests)
     if (bookingDetails.isBhutanese) {
       const cidError = validateCID(bookingDetails.cid);
       if (cidError) newErrors.cid = cidError;
+    } else {
+      const passportError = validatePassportNumber(bookingDetails.passportNumber);
+      if (passportError) newErrors.passportNumber = passportError;
     }
 
     // Validate Destination
@@ -334,7 +357,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     }
     
     return newErrors;
-  }, [bookingDetails, room?.maxGuests, hasTimeConflict, validateCID, validateDestination, validateOrigin, validateBhutanesePhone, hotelCheckoutTime]);
+  }, [bookingDetails, room?.maxGuests, hasTimeConflict, validateCID, validatePassportNumber, validateDestination, validateOrigin, validateBhutanesePhone, hotelCheckoutTime]);
 
   // Handle input changes
   const handleInputChange = useCallback((e) => {
@@ -398,17 +421,19 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     setBookingDetails((prev) => ({
       ...prev,
       isBhutanese: checked,
-      cid: checked ? prev.cid : ""
+      cid: checked ? prev.cid : "",
+      passportNumber: checked ? "" : prev.passportNumber
     }));
-    
-    // Clear CID error when switching nationality
-    if (errors.cid) {
+
+    // Clear CID/passport errors when switching nationality
+    if (errors.cid || errors.passportNumber) {
       setErrors((prev) => ({
         ...prev,
-        cid: undefined
+        cid: undefined,
+        passportNumber: undefined
       }));
     }
-  }, [errors.cid]);
+  }, [errors.cid, errors.passportNumber]);
 
   // Handle guests change
   const handleGuestsChange = useCallback((value) => {
@@ -454,6 +479,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
       numberOfRooms: 1,
       phone: "",
       cid: "",
+      passportNumber: "",
       destination: "",
       origin: "",
       isBhutanese: true,
@@ -560,6 +586,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     // Validation helpers
     validateBhutanesePhone,
     validateCID,
+    validatePassportNumber,
     validateDestination,
     validateOrigin,
   };

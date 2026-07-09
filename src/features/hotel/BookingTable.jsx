@@ -17,9 +17,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   TrendingUp,
+  Download,
 } from "lucide-react";
 
 import api from "../../shared/services/Api";
+import { generateBookingReceipt } from "../../shared/utils/receiptGenerator";
 
 import {
   Table,
@@ -119,7 +121,7 @@ const DeleteConfirmationDialog = ({ open, onOpenChange, onConfirm, title, descri
 
 // --- Main component ---
 
-const BookingTable = ({ hotelId }) => {
+const BookingTable = ({ hotelId, refreshSignal }) => {
   const [bookings, setBookings] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -195,7 +197,7 @@ const BookingTable = ({ hotelId }) => {
         fetchBookings(currentPage);
       }
     }
-  }, [currentPage, hotelId, isSearchMode, lastSearchedQuery, refreshTrigger]);
+  }, [currentPage, hotelId, isSearchMode, lastSearchedQuery, refreshTrigger, refreshSignal]);
 
   const updateBookingStatus = async (id, newStatus) => {
     setLoading(true);
@@ -253,6 +255,19 @@ const BookingTable = ({ hotelId }) => {
         </div>,
         { duration: 6000 }
       );
+    }
+  };
+
+  const handleDownloadReceipt = async (bookingId) => {
+    try {
+      const response = await api.get(`/receipts/booking/${bookingId}`);
+      if (response.status === 200 && response.data && response.data.length > 0) {
+        await generateBookingReceipt({ id: bookingId, bookingId }, response.data[0]);
+      } else {
+        toast.error("No receipt found for this booking.");
+      }
+    } catch {
+      toast.error("Failed to download receipt.");
     }
   };
 
@@ -494,10 +509,10 @@ const BookingTable = ({ hotelId }) => {
                   )}
                 </TableCell>
 
-                {/* Total Price */}
+                {/* Total Price (amount actually paid: room price - discount + GST/service charge) */}
                 <TableCell className="px-4 py-3">
                   <span className="text-[13px] font-semibold text-neutral-950 tabular-nums">
-                    Nu. {new Intl.NumberFormat("en-IN").format(booking.totalPrice)}
+                    Nu. {new Intl.NumberFormat("en-IN").format(booking.txnTotalPrice ?? booking.totalPrice)}
                   </span>
                 </TableCell>
 
@@ -531,6 +546,11 @@ const BookingTable = ({ hotelId }) => {
                       <DropdownMenuItem onClick={() => setSelectedBooking(booking)}>
                         <Info className="h-4 w-4 mr-2" /> View Details
                       </DropdownMenuItem>
+                      {booking.adminBooking && (
+                        <DropdownMenuItem onClick={() => handleDownloadReceipt(booking.id)}>
+                          <Download className="h-4 w-4 mr-2" /> Download Receipt
+                        </DropdownMenuItem>
+                      )}
                       {booking.status === "PENDING" && (
                         <DropdownMenuItem onClick={() => updateBookingStatus(booking.id, "CONFIRMED")}>
                           <CheckCircle className="h-4 w-4 mr-2" /> Confirm
@@ -644,7 +664,10 @@ const BookingTable = ({ hotelId }) => {
                     ["Name", selectedBooking.guestName || selectedBooking.name || 'Not provided'],
                     ["Email", selectedBooking.email || 'Not provided'],
                     ["Phone", selectedBooking.phone ? `+975 ${selectedBooking.phone}` : 'Not provided'],
-                    ["CID", selectedBooking.cid || 'Not provided'],
+                    [
+                      selectedBooking.passportNumber ? "Passport" : "CID",
+                      selectedBooking.cid || selectedBooking.passportNumber || 'Not provided',
+                    ],
                     ["Journal No.", selectedBooking.journalNumber || 'Not provided'],
                     ["Guests", selectedBooking.guests],
                   ].map(([label, value]) => (
@@ -747,11 +770,66 @@ const BookingTable = ({ hotelId }) => {
                         </span>
                       </div>
                     </div>
+                  ) : (selectedBooking.discountAmount > 0 || selectedBooking.walkInServiceChargeAmount > 0
+                        || selectedBooking.gstAmount > 0 || selectedBooking.serviceTaxAmount > 0) ? (
+                    <div className="md:col-span-3 bg-neutral-50 rounded-lg border border-neutral-200 p-4 space-y-2.5">
+                      <p className="text-[11px] font-semibold tracking-widest uppercase text-neutral-400 mb-1">Pricing Breakdown</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] text-neutral-500">Room Price</span>
+                        <span className="text-[13px] font-medium text-neutral-950 tabular-nums">
+                          Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.totalPrice)}
+                        </span>
+                      </div>
+                      {selectedBooking.walkInServiceChargeAmount > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] text-neutral-500">
+                            Service Charge{selectedBooking.walkInServiceChargeRate ? ` (${Math.round(selectedBooking.walkInServiceChargeRate * 100)}%)` : ''}
+                          </span>
+                          <span className="text-[13px] font-medium text-neutral-950 tabular-nums">
+                            +Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.walkInServiceChargeAmount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedBooking.gstAmount > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] text-neutral-500">
+                            GST{selectedBooking.gstRate ? ` (${Math.round(selectedBooking.gstRate * 100)}%)` : ''}
+                          </span>
+                          <span className="text-[13px] font-medium text-neutral-950 tabular-nums">
+                            +Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.gstAmount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedBooking.serviceTaxAmount > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] text-neutral-500">
+                            Service Tax{selectedBooking.serviceTaxRate ? ` (${Math.round(selectedBooking.serviceTaxRate * 100)}%)` : ''}
+                          </span>
+                          <span className="text-[13px] font-medium text-neutral-950 tabular-nums">
+                            +Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.serviceTaxAmount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedBooking.discountAmount > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] text-red-600">Discount</span>
+                          <span className="text-[13px] font-medium text-red-600 tabular-nums">
+                            -Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.discountAmount)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between border-t border-neutral-200 pt-2.5">
+                        <span className="text-[13px] font-semibold text-neutral-950">Total Price</span>
+                        <span className="text-[15px] font-bold text-neutral-950 tabular-nums">
+                          Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.txnTotalPrice ?? selectedBooking.totalPrice)}
+                        </span>
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-[12px] text-neutral-400">Total Price</span>
                       <span className="text-[14px] font-bold text-neutral-950 tabular-nums">
-                        Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.totalPrice)}
+                        Nu. {new Intl.NumberFormat("en-IN").format(selectedBooking.txnTotalPrice ?? selectedBooking.totalPrice)}
                       </span>
                     </div>
                   )}

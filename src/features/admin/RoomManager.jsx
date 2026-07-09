@@ -101,6 +101,21 @@ const standardAmenities = [
 
 const roomTypeOptions = ["SINGLE", "DOUBLE", "DELUXE", "SUITE", "FAMILY", "TWIN", "KING", "QUEEN"];
 
+const bedTypeOptions = ["SINGLE", "TWIN", "DOUBLE", "QUEEN", "KING", "BUNK", "SOFA_BED"];
+const bedTypeCapacity = { SINGLE: 1, TWIN: 1, DOUBLE: 2, QUEEN: 2, KING: 2, BUNK: 2, SOFA_BED: 1 };
+const bedTypeLabels = {
+  SINGLE: "Single", TWIN: "Twin", DOUBLE: "Double", QUEEN: "Queen",
+  KING: "King", BUNK: "Bunk", SOFA_BED: "Sofa Bed",
+};
+
+const mealPlanOptions = ["EP", "CP", "MAP", "AP"];
+const mealPlanLabels = {
+  EP: "EP — Room Only",
+  CP: "CP — Continental Plan (+ breakfast)",
+  MAP: "MAP — Modified American Plan (+ breakfast & 1 meal)",
+  AP: "AP — American Plan (+ all meals)",
+};
+
 const ROOM_LIMIT = 10;
 
 const RoomManager = ({ hotelId, subscriptionPlan }) => {
@@ -119,6 +134,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
   const [roomForm, setRoomForm] = useState({
     roomType: "", price: "", roomNumber: "", maxGuests: "",
     active: true, description: "", images: [], amenities: [],
+    bedConfigurations: [], mealPlans: [],
   });
   const [errors, setErrors] = useState({});
 
@@ -182,6 +198,8 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
           description: roomToEdit.description || "",
           images:      roomToEdit.imageUrl?.map((url, index) => ({ url, name: `existing-${index}`, isExisting: true })) || [],
           amenities:   roomToEdit.amenities?.map((name) => standardAmenities.find((a) => a.name === name) || { name, id: Date.now() }) || [],
+          bedConfigurations: roomToEdit.bedConfigurations?.map((bc) => ({ bedType: bc.bedType, quantity: bc.quantity })) || [],
+          mealPlans:   roomToEdit.mealPlans?.map((mp) => ({ planType: mp.planType, priceAdjustment: mp.priceAdjustment })) || [],
         });
       }
     } else if (showForm) {
@@ -190,8 +208,46 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
   }, [editingRoom, showForm, rooms]);
 
   const resetForm = () => {
-    setRoomForm({ roomType: "", price: "", roomNumber: "", maxGuests: "", active: true, description: "", images: [], amenities: [] });
+    setRoomForm({
+      roomType: "", price: "", roomNumber: "", maxGuests: "", active: true, description: "", images: [], amenities: [],
+      bedConfigurations: [], mealPlans: [],
+    });
     setErrors({});
+  };
+
+  const totalBedCapacity = roomForm.bedConfigurations.reduce(
+    (sum, bc) => sum + (bedTypeCapacity[bc.bedType] || 0) * (Number(bc.quantity) || 0), 0
+  );
+  const showBedCapacityWarning = roomForm.bedConfigurations.length > 0
+    && roomForm.maxGuests
+    && totalBedCapacity < Number(roomForm.maxGuests);
+
+  const addBedConfigRow = () => {
+    setRoomForm((prev) => ({ ...prev, bedConfigurations: [...prev.bedConfigurations, { bedType: "SINGLE", quantity: 1 }] }));
+  };
+  const updateBedConfigRow = (index, field, value) => {
+    setRoomForm((prev) => ({
+      ...prev,
+      bedConfigurations: prev.bedConfigurations.map((row, i) => i === index ? { ...row, [field]: value } : row),
+    }));
+  };
+  const removeBedConfigRow = (index) => {
+    setRoomForm((prev) => ({ ...prev, bedConfigurations: prev.bedConfigurations.filter((_, i) => i !== index) }));
+  };
+
+  const addMealPlanRow = () => {
+    const nextPlan = mealPlanOptions.find((p) => !roomForm.mealPlans.some((mp) => mp.planType === p));
+    if (!nextPlan) return;
+    setRoomForm((prev) => ({ ...prev, mealPlans: [...prev.mealPlans, { planType: nextPlan, priceAdjustment: 0 }] }));
+  };
+  const updateMealPlanRow = (index, field, value) => {
+    setRoomForm((prev) => ({
+      ...prev,
+      mealPlans: prev.mealPlans.map((row, i) => i === index ? { ...row, [field]: value } : row),
+    }));
+  };
+  const removeMealPlanRow = (index) => {
+    setRoomForm((prev) => ({ ...prev, mealPlans: prev.mealPlans.filter((_, i) => i !== index) }));
   };
 
   const handleInputChange = (e) => {
@@ -244,9 +300,15 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
   const scrollToFirstError = () => {
     const firstError = Object.keys(errors).find((key) => errors[key]);
-    if (firstError) {
-      const element = formRef.current?.querySelector(`[name="${firstError}"]`);
-      if (element) { element.scrollIntoView({ behavior: "smooth", block: "center" }); element.focus(); }
+    if (!firstError) return;
+    // Query by data-field wrapper rather than [name=] so this also works for
+    // fields like roomType (a Select) and images (a file drop zone) that have
+    // no directly-named input element.
+    const container = formRef.current?.querySelector(`[data-field="${firstError}"]`);
+    if (container) {
+      container.scrollIntoView({ behavior: "smooth", block: "center" });
+      const focusable = container.querySelector("input, textarea, button, [tabindex]");
+      focusable?.focus();
     }
   };
 
@@ -339,7 +401,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
               {/* Row 1: Type + Price */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-field="roomType">
                   <label className="text-[12px] font-medium text-neutral-600">
                     Room Type <span className="text-red-500">*</span>
                   </label>
@@ -358,7 +420,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
                   {errors.roomType && <p className="text-[11px] text-red-500">{errors.roomType}</p>}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-field="price">
                   <label className="text-[12px] font-medium text-neutral-600">
                     Price / night (Nu.) <span className="text-red-500">*</span>
                   </label>
@@ -374,7 +436,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
               {/* Row 2: Room Number + Max Guests */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-field="roomNumber">
                   <label className="text-[12px] font-medium text-neutral-600">
                     Room Number <span className="text-red-500">*</span>
                   </label>
@@ -386,7 +448,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
                   {errors.roomNumber && <p className="text-[11px] text-red-500">{errors.roomNumber}</p>}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5" data-field="maxGuests">
                   <label className="text-[12px] font-medium text-neutral-600">
                     Max Guests <span className="text-red-500">*</span>
                   </label>
@@ -428,7 +490,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
               </div>
 
               {/* Description */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" data-field="description">
                 <label className="text-[12px] font-medium text-neutral-600">
                   Description <span className="text-red-500">*</span>
                 </label>
@@ -441,7 +503,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
               </div>
 
               {/* Images */}
-              <div className="space-y-2">
+              <div className="space-y-2" data-field="images">
                 <div className="flex items-center justify-between">
                   <label className="text-[12px] font-medium text-neutral-600">
                     Room Images <span className="text-red-500">*</span>
@@ -504,6 +566,120 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Bed Configuration */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-neutral-600">Bed Configuration</label>
+                  <button
+                    type="button"
+                    onClick={addBedConfigRow}
+                    className="flex items-center gap-1 text-[11px] font-medium text-neutral-600 hover:text-neutral-950 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" /> Add bed type
+                  </button>
+                </div>
+
+                {roomForm.bedConfigurations.length === 0 && (
+                  <p className="text-[11px] text-neutral-400">No bed types added yet.</p>
+                )}
+
+                {roomForm.bedConfigurations.map((row, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Select value={row.bedType} onValueChange={(v) => updateBedConfigRow(index, "bedType", v)}>
+                      <SelectTrigger className="h-9 flex-1 text-[13px] border-neutral-200 bg-neutral-50 shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bedTypeOptions.map((type) => (
+                          <SelectItem key={type} value={type} className="text-[13px]">{bedTypeLabels[type]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <input
+                      type="number" min="1" step="1"
+                      value={row.quantity}
+                      onChange={(e) => updateBedConfigRow(index, "quantity", Number(e.target.value))}
+                      className="w-20 h-9 rounded-md border border-neutral-200 px-2.5 text-[13px] text-neutral-900 bg-neutral-50 outline-none focus:border-neutral-400 transition-colors tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeBedConfigRow(index)}
+                      className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-md border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {showBedCapacityWarning && (
+                  <p className="text-[11px] text-amber-600">
+                    Beds sleep {totalBedCapacity}, which is less than max guests ({roomForm.maxGuests}).
+                  </p>
+                )}
+              </div>
+
+              {/* Meal Plans */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-neutral-600">Meal Plan</label>
+                  {roomForm.mealPlans.length < mealPlanOptions.length && (
+                    <button
+                      type="button"
+                      onClick={addMealPlanRow}
+                      className="flex items-center gap-1 text-[11px] font-medium text-neutral-600 hover:text-neutral-950 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Add meal plan
+                    </button>
+                  )}
+                </div>
+
+                {roomForm.mealPlans.length === 0 && (
+                  <p className="text-[11px] text-neutral-400">No meal plans added yet.</p>
+                )}
+
+                {roomForm.mealPlans.map((row, index) => {
+                  const totalPrice = (Number(roomForm.price) || 0) + (Number(row.priceAdjustment) || 0);
+                  return (
+                    <div key={index} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Select value={row.planType} onValueChange={(v) => updateMealPlanRow(index, "planType", v)}>
+                          <SelectTrigger className="h-9 flex-1 text-[13px] border-neutral-200 bg-neutral-50 shadow-none">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {mealPlanOptions
+                              .filter((p) => p === row.planType || !roomForm.mealPlans.some((mp) => mp.planType === p))
+                              .map((type) => (
+                                <SelectItem key={type} value={type} className="text-[13px]">{mealPlanLabels[type]}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className="text-[12px] text-neutral-400">+Nu.</span>
+                          <input
+                            type="number" min="0" step="1"
+                            value={row.priceAdjustment}
+                            onChange={(e) => updateMealPlanRow(index, "priceAdjustment", Number(e.target.value))}
+                            className="w-20 h-9 rounded-md border border-neutral-200 px-2.5 text-[13px] text-neutral-900 bg-neutral-50 outline-none focus:border-neutral-400 transition-colors tabular-nums"
+                          />
+                          <span className="text-[12px] text-neutral-400">/night</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeMealPlanRow(index)}
+                          className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-md border border-neutral-200 text-neutral-400 hover:text-red-600 hover:border-red-200 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 pl-0.5">
+                        Total room price with {row.planType}: <span className="font-medium text-neutral-600 tabular-nums">Nu. {totalPrice.toFixed(2)}</span> / night
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
 
             </div>

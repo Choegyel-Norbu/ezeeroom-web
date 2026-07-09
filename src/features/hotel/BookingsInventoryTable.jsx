@@ -165,6 +165,7 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
         Phone: b.phone,
         Email: b.email,
         CID: b.cid,
+        Passport: b.passportNumber,
         "Room Number": b.roomNumber,
         Passcode: b.passcode,
         "Check-In Date": b.checkInDate,
@@ -316,7 +317,7 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-neutral-100 hover:bg-transparent">
-                  {["CID", "Guest Details", "Room", "Stay Period", "Guests", "Status", "Transfer", "Price", "Travel Info", "Booked On"].map((h) => (
+                  {["CID / Passport", "Guest Details", "Room", "Stay Period", "Guests", "Status", "Transfer", "Price", "Travel Info", "Booked On"].map((h) => (
                     <TableHead key={h} className="h-9 text-[11px] font-semibold tracking-widest uppercase text-neutral-400 bg-neutral-50 px-4 whitespace-nowrap">
                       {h}
                     </TableHead>
@@ -327,11 +328,14 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
                 {bookings.map((booking) => (
                   <TableRow key={booking.id} className="border-b border-neutral-100 hover:bg-neutral-50/60 transition-colors">
 
-                    {/* CID */}
+                    {/* CID / Passport */}
                     <TableCell className="px-4 py-3">
                       <span className="text-[13px] font-medium text-neutral-950 font-mono tabular-nums">
-                        {booking.cid || <span className="text-neutral-300 font-sans">—</span>}
+                        {booking.cid || booking.passportNumber || <span className="text-neutral-300 font-sans">—</span>}
                       </span>
+                      {!booking.cid && booking.passportNumber && (
+                        <div className="text-[10px] text-neutral-400 font-sans mt-0.5">Passport</div>
+                      )}
                     </TableCell>
 
                     {/* Guest Details */}

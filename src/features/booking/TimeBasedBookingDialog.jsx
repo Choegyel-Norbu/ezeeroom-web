@@ -256,6 +256,7 @@ export default function TimeBasedBookingDialog({
         // txnTotalPrice: calculateTxnTotalPrice(),
         phone: bookingDetails.phone,
         cid: bookingDetails.cid,
+        passportNumber: bookingDetails.passportNumber,
         destination: bookingDetails.destination,
         origin: bookingDetails.origin,
         guestName: bookingDetails.guestName || "Guest",
@@ -727,6 +728,36 @@ export default function TimeBasedBookingDialog({
                     
                     {errors.cid && (
                       <p className="text-sm text-destructive">{errors.cid}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Passport Number - Only show for non-Bhutanese */}
+                {!bookingDetails.isBhutanese && (
+                  <div className="grid gap-2" data-field="passportNumber">
+                    <Label htmlFor="passportNumber" className="text-sm">Passport Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="passportNumber"
+                      name="passportNumber"
+                      type="text"
+                      value={bookingDetails.passportNumber}
+                      onChange={handleInputChange}
+                      placeholder="Enter passport number"
+                      maxLength={20}
+                      className={`h-10 text-sm placeholder:text-muted-foreground/50 ${errors.passportNumber ? "border-destructive" : ""}`}
+                    />
+
+                    <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <p className="text-xs text-amber-800">
+                        <strong>Important:</strong> Please enter your correct passport number as you will need to present it during check-in for verification.
+                      </p>
+                    </div>
+
+                    {errors.passportNumber && (
+                      <p className="text-sm text-destructive">{errors.passportNumber}</p>
                     )}
                   </div>
                 )}

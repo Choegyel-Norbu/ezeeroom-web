@@ -31,7 +31,14 @@ import { useTimeBasedBooking } from "../../shared/hooks/useTimeBasedBooking";
 // the backend's PriceCalculationService. Never rounds up to a whole Ngultrum.
 const round2 = (amount) => Math.round((amount + Number.EPSILON) * 100) / 100;
 
-export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingSuccess, isDisabled = false }) {
+export default function AdminBookingForm({
+  hotelId,
+  hotelGst = false,
+  hotelWalkInServiceChargeEnabled = false,
+  hotelWalkInServiceChargePercent = 0,
+  onBookingSuccess,
+  isDisabled = false,
+}) {
   const [openBookingDialog, setOpenBookingDialog] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -51,11 +58,14 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
     phone: "",
     guestName: "",
     cid: "",
+    passportNumber: "",
     destination: "",
     origin: "",
     isBhutanese: true,
   });
   const [errors, setErrors] = useState({});
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [waiveWalkInServiceCharge, setWaiveWalkInServiceCharge] = useState(false);
 
   // Get selected room for time-based booking hook
   const selectedRoomForHook = availableRooms.find(room => room.roomNumber === bookingDetails.roomNumber);
@@ -73,10 +83,7 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
     resetForm: resetTimeBasedForm,
     calculateCheckOutTime,
     getFormattedCheckInTime,
-    calculateTotalPrice: calculateTimeBasedTotalPrice,
-    calculateServiceTax: calculateTimeBasedServiceTax,
     calculateGst: calculateTimeBasedRoomGst,
-    calculateTxnTotalPrice: calculateTimeBasedTxnTotalPrice,
     calculateBasePrice: calculateTimeBasedBasePrice,
     validateForm: validateTimeBasedForm,
     getExistingBookingsForDate,
@@ -503,12 +510,44 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
     return round2(calculateTotalPrice() * 0.05);
   };
 
-  const calculateServiceTax = () => {
-    return round2(calculateTotalPrice() * 0.03);
+  // Walk-in (admin) bookings are exempt from the platform's service charge;
+  // the hotel's own walk-in service charge applies instead, unless waived.
+  const calculateWalkInServiceCharge = () => {
+    if (!hotelWalkInServiceChargeEnabled || waiveWalkInServiceCharge) return 0;
+    return round2(calculateTotalPrice() * (hotelWalkInServiceChargePercent / 100));
+  };
+
+  const calculateAppliedDiscount = () => {
+    const requested = parseFloat(discountAmount) || 0;
+    if (requested <= 0) return 0;
+    const preDiscountTotal = calculateTotalPrice() + calculateGst() + calculateWalkInServiceCharge();
+    return round2(Math.min(requested, preDiscountTotal));
   };
 
   const calculateTxnTotalPrice = () => {
-    return round2(calculateTotalPrice() + calculateServiceTax() + calculateGst());
+    return round2(
+      calculateTotalPrice() + calculateGst() + calculateWalkInServiceCharge() - calculateAppliedDiscount()
+    );
+  };
+
+  // Same overrides for time-based (hourly) bookings, using the hook's base price/GST.
+  const calculateTimeBasedWalkInServiceCharge = () => {
+    if (!hotelWalkInServiceChargeEnabled || waiveWalkInServiceCharge) return 0;
+    return round2(calculateTimeBasedBasePrice() * (hotelWalkInServiceChargePercent / 100));
+  };
+
+  const calculateTimeBasedAppliedDiscount = () => {
+    const requested = parseFloat(discountAmount) || 0;
+    if (requested <= 0) return 0;
+    const preDiscountTotal = calculateTimeBasedBasePrice() + calculateTimeBasedRoomGst() + calculateTimeBasedWalkInServiceCharge();
+    return round2(Math.min(requested, preDiscountTotal));
+  };
+
+  const calculateTimeBasedTxnTotalPriceWithWalkIn = () => {
+    return round2(
+      calculateTimeBasedBasePrice() + calculateTimeBasedRoomGst()
+        + calculateTimeBasedWalkInServiceCharge() - calculateTimeBasedAppliedDiscount()
+    );
   };
 
   // Helper function to scroll to and focus the first error field
@@ -663,6 +702,18 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
             newErrors.cid = "CID number cannot be all same digits";
           }
           // CID is valid if it passes all the above checks
+        }
+      }
+    } else {
+      // Validate Passport Number (only required for non-Bhutanese guests)
+      if (!bookingDetails.passportNumber.trim()) {
+        newErrors.passportNumber = "Passport number is required for non-Bhutanese guests";
+      } else {
+        const passportNumber = bookingDetails.passportNumber.trim();
+        if (!/^[A-Za-z0-9]{5,20}$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number must be 5-20 letters/digits";
+        } else if (/^([A-Za-z0-9])\1+$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number cannot be all the same character";
         }
       }
     }
@@ -889,6 +940,8 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
           adminBooking: true,
           timeBased: true,
           initiatePayment: false, // Admin bookings don't initiate payment
+          discountAmount: parseFloat(discountAmount) || undefined,
+          waiveWalkInServiceCharge,
         };
       } else {
         // Regular booking payload
@@ -907,19 +960,21 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
           // Set userId to null for all third-party bookings
           userId: null,
           adminBooking: true,
+          discountAmount: parseFloat(discountAmount) || undefined,
+          waiveWalkInServiceCharge,
         };
       }
-      
+
       const res = await api.post("/bookings", payload);
       if (res.status === 200) {
         const bookingType = isTimeBasedBooking ? "Hourly" : "Regular";
         const guestName = isTimeBasedBooking ? timeBasedDetails.guestName || "Guest" : bookingDetails.guestName;
-        
+
         toast.success(`${bookingType} Booking Successful!`, {
           description: `Room ${bookingDetails.roomNumber} has been booked for ${guestName}.`,
-          duration: 6000
+          duration: 6000,
         });
-        
+
         // Reset form based on booking type
         if (isTimeBasedBooking) {
           resetTimeBasedForm();
@@ -935,6 +990,7 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
             phone: "",
             guestName: "",
             cid: "",
+            passportNumber: "",
             destination: "",
             origin: "",
             isBhutanese: true,
@@ -942,6 +998,8 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
         }
         setErrors({});
         setTimeBasedErrors({});
+        setDiscountAmount("");
+        setWaiveWalkInServiceCharge(false);
         setOpenBookingDialog(false);
         
         // Only call onBookingSuccess to refresh data - avoid multiple API calls
@@ -965,7 +1023,8 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
   const days = calculateDays();
   const totalPrice = calculateTotalPrice();
   const gstAmount = calculateGst();
-  const serviceTaxAmount = calculateServiceTax();
+  const walkInServiceChargeAmount = calculateWalkInServiceCharge();
+  const appliedDiscount = calculateAppliedDiscount();
   const txnTotalPrice = calculateTxnTotalPrice();
   const selectedRoom = getSelectedRoom();
 
@@ -1361,14 +1420,16 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
                           setBookingDetails((prev) => ({
                             ...prev,
                             isBhutanese: checked,
-                            // Clear CID when switching to non-Bhutanese
-                            cid: checked ? prev.cid : ""
+                            // Clear CID/passport when switching nationality
+                            cid: checked ? prev.cid : "",
+                            passportNumber: checked ? "" : prev.passportNumber
                           }));
-                          // Clear CID error when switching nationality
-                          if (errors.cid) {
+                          // Clear CID/passport errors when switching nationality
+                          if (errors.cid || errors.passportNumber) {
                             setErrors((prev) => ({
                               ...prev,
-                              cid: undefined
+                              cid: undefined,
+                              passportNumber: undefined
                             }));
                           }
                         }
@@ -1395,6 +1456,29 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
                     {(isTimeBasedBooking ? timeBasedErrors.cid : errors.cid) && (
                       <p className="text-sm text-destructive">
                         {isTimeBasedBooking ? timeBasedErrors.cid : errors.cid}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Passport Number - Only show for non-Bhutanese */}
+                {!(isTimeBasedBooking ? timeBasedDetails.isBhutanese : bookingDetails.isBhutanese) && (
+                  <div className="grid gap-2" data-field="passportNumber">
+                    <Label htmlFor="passportNumber" className="text-sm">Passport Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="passportNumber"
+                      name="passportNumber"
+                      type="text"
+                      value={isTimeBasedBooking ? timeBasedDetails.passportNumber : bookingDetails.passportNumber}
+                      onChange={isTimeBasedBooking ? handleTimeBasedInputChange : handleInputChange}
+                      placeholder="Enter passport number"
+                      maxLength={20}
+                      className={`h-10 text-sm ${(isTimeBasedBooking ? timeBasedErrors.passportNumber : errors.passportNumber) ? "border-destructive" : ""}`}
+                    />
+
+                    {(isTimeBasedBooking ? timeBasedErrors.passportNumber : errors.passportNumber) && (
+                      <p className="text-sm text-destructive">
+                        {isTimeBasedBooking ? timeBasedErrors.passportNumber : errors.passportNumber}
                       </p>
                     )}
                   </div>
@@ -1478,6 +1562,38 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
 
               <Separator className="my-2" />
 
+              <div className="grid gap-3">
+                <div className="grid gap-2" data-field="discountAmount">
+                  <Label htmlFor="discountAmount">Discount (Nu.)</Label>
+                  <Input
+                    id="discountAmount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={discountAmount}
+                    onChange={(e) => setDiscountAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">Optional flat discount for this walk-in booking.</p>
+                </div>
+
+                {hotelWalkInServiceChargeEnabled && (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+                    <div>
+                      <p className="text-sm font-medium">Waive Service Charge</p>
+                      <p className="text-xs text-muted-foreground">Skip the hotel's service charge for this booking.</p>
+                    </div>
+                    <Switch
+                      checked={waiveWalkInServiceCharge}
+                      onCheckedChange={setWaiveWalkInServiceCharge}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Separator className="my-2" />
+
               {selectedRoom && (
                 <div className="space-y-2 text-sm">
                   {isTimeBasedBooking ? (
@@ -1521,12 +1637,22 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Service Tax (3%)</span>
-                        <span className="font-medium">
-                          Nu {calculateTimeBasedServiceTax().toFixed(2)}
-                        </span>
-                      </div>
+                      {calculateTimeBasedWalkInServiceCharge() > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Service Charge ({hotelWalkInServiceChargePercent}%)</span>
+                          <span className="font-medium">
+                            Nu {calculateTimeBasedWalkInServiceCharge().toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {calculateTimeBasedAppliedDiscount() > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Discount</span>
+                          <span className="font-medium text-red-600">
+                            -Nu {calculateTimeBasedAppliedDiscount().toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                       <Separator className="my-2" />
                       <div className="flex justify-between font-bold text-base">
                         <span>Base Price</span>
@@ -1534,7 +1660,7 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
                       </div>
                       <div className="flex justify-between font-bold text-base text-blue-600">
                         <span>Total Payable</span>
-                        <span>Nu {calculateTimeBasedTxnTotalPrice().toFixed(2)}</span>
+                        <span>Nu {calculateTimeBasedTxnTotalPriceWithWalkIn().toFixed(2)}</span>
                       </div>
                       {(!timeBasedDetails.checkInDate || !timeBasedDetails.checkInTime || !timeBasedDetails.bookHours) && (
                         <p className="text-sm text-amber-600">
@@ -1588,10 +1714,16 @@ export default function AdminBookingForm({ hotelId, hotelGst = false, onBookingS
                           <span className="font-medium">Nu {gstAmount.toFixed(2)}</span>
                         </div>
                       )}
-                      {days > 0 && (
+                      {days > 0 && walkInServiceChargeAmount > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Service Tax (3%)</span>
-                          <span className="font-medium">Nu {serviceTaxAmount.toFixed(2)}</span>
+                          <span className="text-muted-foreground">Service Charge ({hotelWalkInServiceChargePercent}%)</span>
+                          <span className="font-medium">Nu {walkInServiceChargeAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {days > 0 && appliedDiscount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Discount</span>
+                          <span className="font-medium text-red-600">-Nu {appliedDiscount.toFixed(2)}</span>
                         </div>
                       )}
                       <Separator className="my-2" />

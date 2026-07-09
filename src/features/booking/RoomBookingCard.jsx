@@ -56,6 +56,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
   const [immediateBookingDetails, setImmediateBookingDetails] = useState({
     phone: "",
     cid: "",
+    passportNumber: "",
     destination: "",
     origin: "",
     guests: 1,
@@ -69,9 +70,11 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     numberOfRooms: 1,
     phone: "",
     cid: "",
+    passportNumber: "",
     destination: "",
     origin: "",
     isBhutanese: true,
+    mealPlanType: "EP",
   });
   const [errors, setErrors] = useState({});
   const [isBookingLoading, setIsBookingLoading] = useState(false);
@@ -235,11 +238,20 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     return daysDiff > 0 ? daysDiff : 0;
   };
 
+  // EP (Room Only) is always available at zero adjustment; other plans only
+  // exist if the hotel configured them on the room.
+  const getMealPlanAdjustment = (planType) => {
+    if (!planType || planType === "EP") return 0;
+    const plan = room.mealPlans?.find((mp) => mp.planType === planType);
+    return plan?.priceAdjustment || 0;
+  };
+
   // Rounding matches the backend's PriceCalculationService (RoundingMode.HALF_UP to
   // 2 decimal places) so the preview shown here matches what's actually charged.
   const calculateTotalPrice = () => {
     const days = calculateDays();
-    const basePrice = days * room.price * bookingDetails.numberOfRooms;
+    const nightlyRate = room.price + getMealPlanAdjustment(bookingDetails.mealPlanType);
+    const basePrice = days * nightlyRate * bookingDetails.numberOfRooms;
     return round2(basePrice); // Just the base price without tax
   };
 
@@ -258,7 +270,8 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
 
   const calculateBasePrice = () => {
     const days = calculateDays();
-    return days * room.price * bookingDetails.numberOfRooms;
+    const nightlyRate = room.price + getMealPlanAdjustment(bookingDetails.mealPlanType);
+    return days * nightlyRate * bookingDetails.numberOfRooms;
   };
 
   // Helper function to scroll to and focus the first error field
@@ -361,6 +374,18 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
             newErrors.cid = "CID number cannot be all same digits";
           }
           // CID is valid if it passes all the above checks
+        }
+      }
+    } else {
+      // Validate Passport Number (only required for non-Bhutanese guests)
+      if (!bookingDetails.passportNumber.trim()) {
+        newErrors.passportNumber = "Passport number is required for non-Bhutanese guests";
+      } else {
+        const passportNumber = bookingDetails.passportNumber.trim();
+        if (!/^[A-Za-z0-9]{5,20}$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number must be 5-20 letters/digits";
+        } else if (/^([A-Za-z0-9])\1+$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number cannot be all the same character";
         }
       }
     }
@@ -733,6 +758,18 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
           }
         }
       }
+    } else {
+      // Validate Passport Number (only required for non-Bhutanese guests)
+      if (!immediateBookingDetails.passportNumber.trim()) {
+        newErrors.passportNumber = "Passport number is required for non-Bhutanese guests";
+      } else {
+        const passportNumber = immediateBookingDetails.passportNumber.trim();
+        if (!/^[A-Za-z0-9]{5,20}$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number must be 5-20 letters/digits";
+        } else if (/^([A-Za-z0-9])\1+$/.test(passportNumber)) {
+          newErrors.passportNumber = "Passport number cannot be all the same character";
+        }
+      }
     }
 
     // Validate Destination
@@ -842,6 +879,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
           numberOfRooms: 1,
           phone: "",
           cid: "",
+          passportNumber: "",
           destination: "",
           origin: "",
           isBhutanese: true,
@@ -898,6 +936,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
         // Use user input values
         phone: immediateBookingDetails.phone,
         cid: immediateBookingDetails.cid,
+        passportNumber: immediateBookingDetails.passportNumber,
         destination: immediateBookingDetails.destination,
         origin: immediateBookingDetails.origin,
         adminBooking: false,
@@ -940,6 +979,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
         setImmediateBookingDetails({
           phone: "",
           cid: "",
+          passportNumber: "",
           destination: "",
           origin: "",
           guests: 1,
@@ -1422,14 +1462,16 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                         setBookingDetails((prev) => ({
                           ...prev,
                           isBhutanese: checked,
-                          // Clear CID when switching to non-Bhutanese
-                          cid: checked ? prev.cid : ""
+                          // Clear CID/passport when switching nationality
+                          cid: checked ? prev.cid : "",
+                          passportNumber: checked ? "" : prev.passportNumber
                         }));
-                        // Clear CID error when switching nationality
-                        if (errors.cid) {
+                        // Clear CID/passport errors when switching nationality
+                        if (errors.cid || errors.passportNumber) {
                           setErrors((prev) => ({
                             ...prev,
-                            cid: undefined
+                            cid: undefined,
+                            passportNumber: undefined
                           }));
                         }
                       }}
@@ -1464,6 +1506,35 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     
                     {errors.cid && (
                       <p className="text-sm text-destructive">{errors.cid}</p>
+                    )}
+                  </div>
+                )}
+
+                {!bookingDetails.isBhutanese && (
+                  <div className="grid gap-2" data-field="passportNumber">
+                    <Label htmlFor="passportNumber" className="text-sm">Passport Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="passportNumber"
+                      name="passportNumber"
+                      type="text"
+                      value={bookingDetails.passportNumber}
+                      onChange={handleInputChange}
+                      placeholder="Enter passport number"
+                      maxLength={20}
+                      className={`h-10 text-sm placeholder:text-muted-foreground/50 ${errors.passportNumber ? "border-destructive" : ""}`}
+                    />
+
+                    <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <p className="text-xs text-amber-800">
+                        <strong>Important:</strong> Please enter your correct passport number as you will need to present it during check-in for verification.
+                      </p>
+                    </div>
+
+                    {errors.passportNumber && (
+                      <p className="text-sm text-destructive">{errors.passportNumber}</p>
                     )}
                   </div>
                 )}
@@ -1545,6 +1616,29 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     </p>
                   )}
                 </div>
+
+                {room.mealPlans?.length > 0 && (
+                  <div className="grid gap-2" data-field="mealPlanType">
+                    <Label htmlFor="mealPlanType" className="text-sm">Meal Plan</Label>
+                    <Select
+                      name="mealPlanType"
+                      value={bookingDetails.mealPlanType}
+                      onValueChange={(value) => setBookingDetails((prev) => ({ ...prev, mealPlanType: value }))}
+                    >
+                      <SelectTrigger className="w-full h-10 text-sm">
+                        <SelectValue placeholder="Select meal plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EP">EP — Room Only (+Nu 0)</SelectItem>
+                        {room.mealPlans.map((mp) => (
+                          <SelectItem key={mp.planType} value={mp.planType}>
+                            {mp.planType} (+Nu {mp.priceAdjustment}/night)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <Separator className="my-2" />
@@ -1572,6 +1666,16 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     Nu {room.price.toFixed(2)}
                   </span>
                 </div>
+                {bookingDetails.mealPlanType !== "EP" && getMealPlanAdjustment(bookingDetails.mealPlanType) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Meal Plan ({bookingDetails.mealPlanType}) / night
+                    </span>
+                    <span className="font-medium">
+                      +Nu {getMealPlanAdjustment(bookingDetails.mealPlanType).toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 {days > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
@@ -1722,6 +1826,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
             setImmediateBookingDetails({
               phone: "",
               cid: "",
+              passportNumber: "",
               destination: "",
               origin: "",
               guests: 1,
@@ -1806,14 +1911,16 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                       setImmediateBookingDetails((prev) => ({
                         ...prev,
                         isBhutanese: checked,
-                        // Clear CID when switching to non-Bhutanese
-                        cid: checked ? prev.cid : ""
+                        // Clear CID/passport when switching nationality
+                        cid: checked ? prev.cid : "",
+                        passportNumber: checked ? "" : prev.passportNumber
                       }));
-                      // Clear CID error when switching nationality
-                      if (immediateBookingErrors.cid) {
+                      // Clear CID/passport errors when switching nationality
+                      if (immediateBookingErrors.cid || immediateBookingErrors.passportNumber) {
                         setImmediateBookingErrors((prev) => ({
                           ...prev,
-                          cid: undefined
+                          cid: undefined,
+                          passportNumber: undefined
                         }));
                       }
                     }}
@@ -1851,6 +1958,37 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                   
                   {immediateBookingErrors.cid && (
                     <p className="text-sm text-destructive">{immediateBookingErrors.cid}</p>
+                  )}
+                </div>
+              )}
+
+              {!immediateBookingDetails.isBhutanese && (
+                <div className="grid gap-2" data-field="passportNumber">
+                  <Label htmlFor="immediatePassportNumber" className="text-sm">
+                    Passport Number <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="immediatePassportNumber"
+                    name="passportNumber"
+                    type="text"
+                    value={immediateBookingDetails.passportNumber}
+                    onChange={handleImmediateInputChange}
+                    placeholder="Enter passport number"
+                    maxLength={20}
+                    className={`h-10 text-sm placeholder:text-muted-foreground/50 ${immediateBookingErrors.passportNumber ? "border-destructive" : ""}`}
+                  />
+
+                  <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <p className="text-xs text-amber-800">
+                      <strong>Important:</strong> Please enter your correct passport number as you will need to present it during check-in for verification.
+                    </p>
+                  </div>
+
+                  {immediateBookingErrors.passportNumber && (
+                    <p className="text-sm text-destructive">{immediateBookingErrors.passportNumber}</p>
                   )}
                 </div>
               )}

@@ -32,6 +32,8 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/ios-spinner";
 import {
@@ -46,6 +48,7 @@ import { Badge } from "@/shared/components/badge";
 import { Avatar, AvatarFallback } from "@/shared/components/avatar";
 import { Input } from "@/shared/components/input";
 import { Label } from "@/shared/components/label";
+import { Switch } from "@/shared/components/switch";
 import StaffManager from "./StaffManager";
 import BookingsTrendChart from "./BookingsTrendChart";
 import MonthlyPerformanceChart from "./MonthlyPerformanceChart";
@@ -139,6 +142,7 @@ const HotelAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [hotel, setHotel] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [bookingsRefreshSignal, setBookingsRefreshSignal] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -168,6 +172,36 @@ const HotelAdminDashboard = () => {
 
   // Billing tab state (Invoices / Receipts)
   const [billingTab, setBillingTab] = useState("receipts");
+  const [settingsSubTab, setSettingsSubTab] = useState("hotelInfo");
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [notifyOnNewBooking, setNotifyOnNewBooking] = useState(true);
+  const [notifyOnCancellation, setNotifyOnCancellation] = useState(true);
+  const [gstEnabled, setGstEnabled] = useState(false);
+  const [hasTimeBasedEnabled, setHasTimeBasedEnabled] = useState(false);
+  const [hasRestaurantEnabled, setHasRestaurantEnabled] = useState(false);
+  const [walkInServiceChargeEnabled, setWalkInServiceChargeEnabled] = useState(false);
+  const [walkInServiceChargePercent, setWalkInServiceChargePercent] = useState("");
+  const [savingNotifyNewBooking, setSavingNotifyNewBooking] = useState(false);
+  const [savingNotifyCancellation, setSavingNotifyCancellation] = useState(false);
+  const [savingGst, setSavingGst] = useState(false);
+  const [savingHasTimeBased, setSavingHasTimeBased] = useState(false);
+  const [savingHasRestaurant, setSavingHasRestaurant] = useState(false);
+  const [savingWalkInServiceCharge, setSavingWalkInServiceCharge] = useState(false);
+
+  // Restaurant setup form state
+  const [restaurantForm, setRestaurantForm] = useState({
+    restaurantName: "",
+    licenseNo: "",
+    address: "",
+    tpn: "",
+    username: "",
+    password: "",
+    email: "",
+    phoneNumber: "",
+  });
+  const [restaurantFormErrors, setRestaurantFormErrors] = useState({});
+  const [showRestaurantPassword, setShowRestaurantPassword] = useState(false);
+  const [submittingRestaurant, setSubmittingRestaurant] = useState(false);
 
   // Invoices state
   const [invoices, setInvoices] = useState([]);
@@ -620,6 +654,200 @@ const HotelAdminDashboard = () => {
     setHotel(updatedHotel);
   };
 
+  useEffect(() => {
+    if (hotel) {
+      setNotifyOnNewBooking(hotel.notifyOnNewBooking ?? true);
+      setNotifyOnCancellation(hotel.notifyOnCancellation ?? true);
+      setGstEnabled(hotel.gst ?? false);
+      setHasTimeBasedEnabled(hotel.hasTimeBased ?? false);
+      setHasRestaurantEnabled(hotel.hasRestaurant ?? false);
+      setWalkInServiceChargeEnabled(hotel.walkInServiceCharge ?? false);
+      setWalkInServiceChargePercent(
+        hotel.walkInServiceChargePercent != null ? String(hotel.walkInServiceChargePercent) : ""
+      );
+    }
+  }, [hotel?.id]);
+
+  const saveGeneralHotelSettings = async (overrides = {}) => {
+    const walkInCharge = overrides.walkInServiceCharge ?? walkInServiceChargeEnabled;
+    const payload = {
+      hasTimeBased: overrides.hasTimeBased ?? hasTimeBasedEnabled,
+      gst: overrides.gst ?? gstEnabled,
+      notifyOnNewBooking: overrides.notifyOnNewBooking ?? notifyOnNewBooking,
+      notifyOnCancellation: overrides.notifyOnCancellation ?? notifyOnCancellation,
+      hasRestaurant: overrides.hasRestaurant ?? hasRestaurantEnabled,
+      walkInServiceCharge: walkInCharge,
+      walkInServiceChargePercent: walkInCharge
+        ? parseFloat(overrides.walkInServiceChargePercent ?? walkInServiceChargePercent) || 0
+        : null,
+    };
+    const res = await api.put(`/hotels/${hotel.id}`, payload);
+    updateHotel(res.data);
+    return res.data;
+  };
+
+  const handleToggleNewBookingNotify = async (checked) => {
+    setNotifyOnNewBooking(checked);
+    setSavingNotifyNewBooking(true);
+    try {
+      await saveGeneralHotelSettings({ notifyOnNewBooking: checked });
+      toast.success(checked ? "New booking alerts enabled." : "New booking alerts disabled.");
+    } catch (err) {
+      console.error("Notification preference update error:", err);
+      setNotifyOnNewBooking(!checked);
+      toast.error("Failed to update notification preference.");
+    } finally {
+      setSavingNotifyNewBooking(false);
+    }
+  };
+
+  const handleToggleCancellationNotify = async (checked) => {
+    setNotifyOnCancellation(checked);
+    setSavingNotifyCancellation(true);
+    try {
+      await saveGeneralHotelSettings({ notifyOnCancellation: checked });
+      toast.success(checked ? "Cancellation alerts enabled." : "Cancellation alerts disabled.");
+    } catch (err) {
+      console.error("Notification preference update error:", err);
+      setNotifyOnCancellation(!checked);
+      toast.error("Failed to update notification preference.");
+    } finally {
+      setSavingNotifyCancellation(false);
+    }
+  };
+
+  const handleToggleGst = async (checked) => {
+    setGstEnabled(checked);
+    setSavingGst(true);
+    try {
+      await saveGeneralHotelSettings({ gst: checked });
+      toast.success(checked ? "GST enabled." : "GST disabled.");
+    } catch (err) {
+      console.error("GST update error:", err);
+      setGstEnabled(!checked);
+      toast.error("Failed to update GST setting.");
+    } finally {
+      setSavingGst(false);
+    }
+  };
+
+  const handleToggleHasTimeBased = async (checked) => {
+    setHasTimeBasedEnabled(checked);
+    setSavingHasTimeBased(true);
+    try {
+      await saveGeneralHotelSettings({ hasTimeBased: checked });
+      toast.success(checked ? "Hourly booking enabled." : "Hourly booking disabled.");
+    } catch (err) {
+      console.error("Hourly booking update error:", err);
+      setHasTimeBasedEnabled(!checked);
+      toast.error("Failed to update hourly booking setting.");
+    } finally {
+      setSavingHasTimeBased(false);
+    }
+  };
+
+  const handleToggleHasRestaurant = async (checked) => {
+    setHasRestaurantEnabled(checked);
+    setSavingHasRestaurant(true);
+    try {
+      await saveGeneralHotelSettings({ hasRestaurant: checked });
+      toast.success(checked ? "Restaurant enabled." : "Restaurant disabled.");
+    } catch (err) {
+      console.error("Restaurant setting update error:", err);
+      setHasRestaurantEnabled(!checked);
+      toast.error("Failed to update restaurant setting.");
+    } finally {
+      setSavingHasRestaurant(false);
+    }
+  };
+
+  const handleToggleWalkInServiceCharge = async (checked) => {
+    const previousPercent = walkInServiceChargePercent;
+    setWalkInServiceChargeEnabled(checked);
+    setSavingWalkInServiceCharge(true);
+    try {
+      const updated = await saveGeneralHotelSettings({ walkInServiceCharge: checked });
+      setWalkInServiceChargePercent(
+        updated.walkInServiceChargePercent != null ? String(updated.walkInServiceChargePercent) : ""
+      );
+      toast.success(checked ? "Hotel service charge enabled." : "Hotel service charge disabled.");
+    } catch (err) {
+      console.error("Walk-in service charge update error:", err);
+      setWalkInServiceChargeEnabled(!checked);
+      setWalkInServiceChargePercent(previousPercent);
+      toast.error("Failed to update hotel service charge.");
+    } finally {
+      setSavingWalkInServiceCharge(false);
+    }
+  };
+
+  const handleSaveWalkInServiceChargePercent = async () => {
+    const parsed = parseFloat(walkInServiceChargePercent);
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      toast.error("Enter a service charge between 0 and 100.");
+      return;
+    }
+    setSavingWalkInServiceCharge(true);
+    try {
+      await saveGeneralHotelSettings({ walkInServiceCharge: true, walkInServiceChargePercent: parsed });
+      toast.success("Hotel service charge percentage updated.");
+    } catch (err) {
+      console.error("Walk-in service charge update error:", err);
+      toast.error("Failed to update hotel service charge.");
+    } finally {
+      setSavingWalkInServiceCharge(false);
+    }
+  };
+
+  const handleRestaurantFormChange = (e) => {
+    const { name, value } = e.target;
+    if (restaurantFormErrors[name]) {
+      setRestaurantFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+    setRestaurantForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validateRestaurantForm = () => {
+    const errors = {};
+    const f = restaurantForm;
+    if (!f.restaurantName) errors.restaurantName = "Restaurant name is required";
+    if (!f.licenseNo) errors.licenseNo = "License number is required";
+    if (!f.address) errors.address = "Address is required";
+    if (!f.username) errors.username = "Username is required";
+    if (!f.email) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
+      errors.email = "Enter a valid email address";
+    }
+    if (!f.password) {
+      errors.password = "Password is required";
+    } else if (f.password.length < 8) {
+      errors.password = "Password must be at least 8 characters";
+    }
+    if (!f.phoneNumber) errors.phoneNumber = "Phone number is required";
+    setRestaurantFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleRegisterRestaurant = async () => {
+    if (!validateRestaurantForm()) return;
+    setSubmittingRestaurant(true);
+    try {
+      const res = await api.post(`/hotels/${hotel.id}/restaurant`, restaurantForm);
+      updateHotel(res.data);
+      toast.success("Restaurant registered successfully.");
+    } catch (err) {
+      console.error("Restaurant registration error:", err);
+      toast.error(err?.response?.data?.message || "Failed to register restaurant.");
+    } finally {
+      setSubmittingRestaurant(false);
+    }
+  };
+
   const updateBookingStatus = (id, status) => {
     setBookings(
       bookings.map((booking) =>
@@ -629,7 +857,7 @@ const HotelAdminDashboard = () => {
   };
 
   const handleBookingSuccess = () => {
-    // Bookings will be refreshed automatically by the BookingTable component
+    setBookingsRefreshSignal((prev) => prev + 1);
   };
 
   // Handle hotel switching
@@ -792,24 +1020,50 @@ const HotelAdminDashboard = () => {
     ...(roles && !roles.includes("FRONTDESK") && !roles.includes("STAFF") ? [
       { id: "billing", label: "Billing", icon: FileText, locked: false },
       ...(hotel?.hasRestaurant ? [{ id: "restaurant", label: "Restaurant", icon: UtensilsCrossed, locked: false }] : []),
-      { id: "hotel", label: "Hotel Settings", icon: Settings, locked: true }
+      {
+        id: "hotel",
+        label: "Settings",
+        icon: Settings,
+        locked: true,
+        subItems: [
+          { id: "hotelInfo", label: "Hotel Setting" },
+          { id: "general", label: "General Setting" },
+        ],
+      }
     ] : [])
   ];
 
   const handleNavItemClick = (item) => {
     if (item.id === "restaurant") {
-      const email = hotel?.restaurantEmail;
-      const loginUrl = `https://zhimpu.dcpl.bt/login${email ? `?email=${encodeURIComponent(email)}` : ""}`;
-      window.open(loginUrl, "_blank", "noopener,noreferrer");
+      if (hotel?.restaurantEmail) {
+        const loginUrl = `https://zhimpu.dcpl.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`;
+        window.open(loginUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      setActiveTab("restaurant");
       return;
+    }
+    if (item.subItems) {
+      if (activeTab === item.id) {
+        setSettingsExpanded((prev) => !prev);
+      } else {
+        setSettingsExpanded(true);
+      }
     }
     setActiveTab(item.id);
   };
 
+  const handleSettingsSubItemClick = (subItem) => {
+    setSettingsSubTab(subItem.id);
+    setActiveTab("hotel");
+  };
+
   const getPageTitle = () => {
+    if (activeTab === "hotel") {
+      return settingsSubTab === "general" ? "General Setting" : "Hotel Setting";
+    }
     const titles = {
       dashboard: "Dashboard",
-      hotel: "Hotel Details",
       rooms: "Room Management",
       staff: "Staff Management",
       inventory: "Bookings Inventory",
@@ -817,6 +1071,7 @@ const HotelAdminDashboard = () => {
       booking: "Booking Management",
       leave: "Leave Management",
       billing: "Billing",
+      restaurant: "Restaurant",
     };
     return titles[activeTab] || "Dashboard";
   };
@@ -838,38 +1093,65 @@ const HotelAdminDashboard = () => {
     return descriptions[activeTab] || "Manage your hotel operations";
   };
 
-  const NavigationButton = ({ item, onClick, isActive }) => {
+  const NavigationButton = ({ item, onClick, isActive, onSubItemClick }) => {
     const Icon = item.icon;
     const isLocked = item.locked && isSubscriptionExpired();
     const showLeaveBadge = item.id === "leave" && leaveNotificationCount > 0;
+    const hasSubItems = !!item.subItems;
+    const isExpanded = hasSubItems && isActive && settingsExpanded;
 
     return (
-      <button
-        onClick={() => {
-          if (isLocked) {
-            toast.error("Subscription expired. Please renew to access this feature.", { duration: 4000 });
-            return;
-          }
-          onClick();
-        }}
-        disabled={isLocked}
-        className={`w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium transition-colors text-left ${
-          isActive
-            ? "bg-neutral-100 text-neutral-950"
-            : isLocked
-            ? "opacity-40 cursor-not-allowed text-neutral-500"
-            : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
-        }`}
-      >
-        <Icon className="h-[15px] w-[15px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.75} />
-        <span className="flex-1 truncate">{item.label}</span>
-        {isLocked && <AlertTriangle className="h-[11px] w-[11px] text-neutral-400 flex-shrink-0" />}
-        {showLeaveBadge && (
-          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-bold">
-            {leaveNotificationCount > 99 ? "99+" : leaveNotificationCount}
-          </span>
+      <div>
+        <button
+          onClick={() => {
+            if (isLocked) {
+              toast.error("Subscription expired. Please renew to access this feature.", { duration: 4000 });
+              return;
+            }
+            onClick();
+          }}
+          disabled={isLocked}
+          className={`w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium transition-colors text-left ${
+            isActive
+              ? "bg-neutral-100 text-neutral-950"
+              : isLocked
+              ? "opacity-40 cursor-not-allowed text-neutral-500"
+              : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
+          }`}
+        >
+          <Icon className="h-[15px] w-[15px] flex-shrink-0" strokeWidth={isActive ? 2 : 1.75} />
+          <span className="flex-1 truncate">{item.label}</span>
+          {isLocked && <AlertTriangle className="h-[11px] w-[11px] text-neutral-400 flex-shrink-0" />}
+          {showLeaveBadge && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-bold">
+              {leaveNotificationCount > 99 ? "99+" : leaveNotificationCount}
+            </span>
+          )}
+          {hasSubItems && (
+            <ChevronDown
+              className={`h-[13px] w-[13px] flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            />
+          )}
+        </button>
+
+        {hasSubItems && isExpanded && !isLocked && (
+          <div className="mt-0.5 ml-[27px] space-y-0.5 border-l border-neutral-100 pl-2">
+            {item.subItems.map((subItem) => (
+              <button
+                key={subItem.id}
+                onClick={() => onSubItemClick(subItem)}
+                className={`w-full flex items-center px-2.5 py-[6px] rounded-md text-[12.5px] font-medium transition-colors text-left ${
+                  settingsSubTab === subItem.id
+                    ? "bg-neutral-100 text-neutral-950"
+                    : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
+                }`}
+              >
+                <span className="truncate">{subItem.label}</span>
+              </button>
+            ))}
+          </div>
         )}
-      </button>
+      </div>
     );
   };
 
@@ -908,7 +1190,8 @@ const HotelAdminDashboard = () => {
 
           {subscriptionPlan && (
             <div className="mt-2">
-              <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-500 text-[11px] font-medium px-2 py-0.5 rounded">
+              <span className="inline-flex items-center gap-1.5 bg-neutral-950 text-white text-[12px] font-semibold px-2.5 py-1 rounded-md tracking-wide">
+                <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
                 {subscriptionPlan === 'TRIAL' ? 'Trial Plan' : subscriptionPlan === 'BASIC' ? 'Basic Plan' : 'Pro Plan'}
               </span>
             </div>
@@ -936,6 +1219,7 @@ const HotelAdminDashboard = () => {
                 item={item}
                 isActive={activeTab === item.id}
                 onClick={() => handleNavItemClick(item)}
+                onSubItemClick={handleSettingsSubItemClick}
               />
             ))}
           </div>
@@ -1138,7 +1422,8 @@ const HotelAdminDashboard = () => {
 
                     {subscriptionPlan && (
                       <div className="mt-2">
-                        <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-500 text-[11px] font-medium px-2 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-1.5 bg-neutral-950 text-white text-[12px] font-semibold px-2.5 py-1 rounded-md tracking-wide">
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
                           {subscriptionPlan === 'TRIAL' ? 'Trial Plan' : subscriptionPlan === 'BASIC' ? 'Basic Plan' : 'Pro Plan'}
                         </span>
                       </div>
@@ -1166,6 +1451,12 @@ const HotelAdminDashboard = () => {
                           isActive={activeTab === item.id}
                           onClick={() => {
                             handleNavItemClick(item);
+                            if (!item.subItems) {
+                              setMobileMenuOpen(false);
+                            }
+                          }}
+                          onSubItemClick={(subItem) => {
+                            handleSettingsSubItemClick(subItem);
                             setMobileMenuOpen(false);
                           }}
                         />
@@ -1271,8 +1562,8 @@ const HotelAdminDashboard = () => {
                     </h4>
                     <p className="mt-1 mb-3 text-[13px] text-neutral-500 leading-relaxed">
                       {subscriptionPlan === 'TRIAL'
-                        ? 'Your trial period has ended. You cannot access some features including Room Management, Hotel Settings, Analytics, Staff Management, and Booking Inventory. Please start a subscription to restore full access.'
-                        : 'Your subscription has expired. You cannot access some features including Room Management, Hotel Settings, Analytics, Staff Management, and Booking Inventory. Please renew your subscription to restore full access.'}
+                        ? 'Your trial period has ended. You cannot access some features including Room Management, Settings, Analytics, Staff Management, and Booking Inventory. Please start a subscription to restore full access.'
+                        : 'Your subscription has expired. You cannot access some features including Room Management, Settings, Analytics, Staff Management, and Booking Inventory. Please renew your subscription to restore full access.'}
                     </p>
                     <Link to="/subscription">
                       <button className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-950 text-white text-[12px] font-medium hover:opacity-85 transition-opacity">
@@ -1879,15 +2170,154 @@ const HotelAdminDashboard = () => {
             <div className="space-y-6">
               {isSubscriptionExpired() ? (
                 <SubscriptionLockedCard
-                  title="Hotel Settings Locked"
+                  title="Settings Locked"
                   message="Please renew your subscription to manage hotel settings."
                 />
-              ) : (
+              ) : settingsSubTab === "general" ? (
                 <>
-                  {/* Hotel Information Section */}
-                  {hotel && (
-                    <HotelInfoForm hotel={hotel} onUpdate={updateHotel} />
-                  )}
+                  {/* Notification Preferences Section */}
+                  <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                    <div className="px-5 py-4 border-b border-neutral-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Notifications</span>
+                      <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Notification Preferences</h2>
+                    </div>
+                    <div className="divide-y divide-neutral-100">
+                      <div className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-neutral-950">New Booking Alerts</p>
+                          <p className="text-[12px] text-neutral-500 mt-0.5">Get notified when a guest makes a new booking.</p>
+                        </div>
+                        <Switch
+                          checked={notifyOnNewBooking}
+                          onCheckedChange={handleToggleNewBookingNotify}
+                          disabled={savingNotifyNewBooking}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-neutral-950">Cancellation Alerts</p>
+                          <p className="text-[12px] text-neutral-500 mt-0.5">Get notified when a guest requests a cancellation.</p>
+                        </div>
+                        <Switch
+                          checked={notifyOnCancellation}
+                          onCheckedChange={handleToggleCancellationNotify}
+                          disabled={savingNotifyCancellation}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tax Settings Section */}
+                  <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                    <div className="px-5 py-4 border-b border-neutral-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Billing</span>
+                      <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Tax Settings</h2>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-5 py-4">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-neutral-950">Enable GST (5%)</p>
+                        <p className="text-[12px] text-neutral-500 mt-0.5">Apply 5% GST on the base booking price. Shown as a separate line item on the booking card.</p>
+                      </div>
+                      <Switch
+                        checked={gstEnabled}
+                        onCheckedChange={handleToggleGst}
+                        disabled={savingGst}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Walk-In Service Charge Section */}
+                  <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                    <div className="px-5 py-4 border-b border-neutral-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Billing</span>
+                      <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Hotel Service Charge</h2>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-5 py-4">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-neutral-950">Enable Hotel Service Charge</p>
+                        <p className="text-[12px] text-neutral-500 mt-0.5">
+                          Applies only to walk-in bookings made by your staff at the front desk. The platform's service charge is waived for these bookings instead.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={walkInServiceChargeEnabled}
+                        onCheckedChange={handleToggleWalkInServiceCharge}
+                        disabled={savingWalkInServiceCharge}
+                      />
+                    </div>
+                    {walkInServiceChargeEnabled && (
+                      <div className="px-5 py-4 border-t border-neutral-100">
+                        <Label className="text-[12px] font-medium text-neutral-700 mb-1.5 block">Service Charge Percentage</Label>
+                        <div className="flex items-center gap-2 max-w-[220px]">
+                          <div className="relative flex-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={walkInServiceChargePercent}
+                              onChange={(e) => setWalkInServiceChargePercent(e.target.value)}
+                              className="pr-7 h-9 text-[13px]"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-neutral-400">%</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSaveWalkInServiceChargePercent}
+                            disabled={savingWalkInServiceCharge}
+                            className="h-9 px-3 rounded-md bg-neutral-950 text-white text-[12px] font-medium hover:opacity-85 transition-opacity disabled:opacity-40 flex-shrink-0"
+                          >
+                            Save
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 mt-1.5">
+                          Calculated on the base room price. Staff can waive it for individual walk-in bookings if needed.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Booking Options Section */}
+                  <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                    <div className="px-5 py-4 border-b border-neutral-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Booking</span>
+                      <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Booking Options</h2>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-5 py-4">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-neutral-950">Enable Hourly Booking</p>
+                        <p className="text-[12px] text-neutral-500 mt-0.5">Allow guests to book rooms for specific hours instead of full days.</p>
+                      </div>
+                      <Switch
+                        checked={hasTimeBasedEnabled}
+                        onCheckedChange={handleToggleHasTimeBased}
+                        disabled={savingHasTimeBased}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Restaurant Section */}
+                  <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                    <div className="px-5 py-4 border-b border-neutral-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Restaurant</span>
+                      <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Restaurant</h2>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-5 py-4">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-neutral-950">Has Restaurant</p>
+                        <p className="text-[12px] text-neutral-500 mt-0.5">
+                          {hotel?.restaurantEmail
+                            ? "Connected to Zhimpu. Contact support to disconnect."
+                            : "Turn this on to set up a restaurant for this hotel from the Restaurant menu."}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={hasRestaurantEnabled}
+                        onCheckedChange={handleToggleHasRestaurant}
+                        disabled={savingHasRestaurant || !!hotel?.restaurantEmail}
+                      />
+                    </div>
+                  </div>
 
                   {/* Account Management Section */}
                   <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
@@ -1956,6 +2386,196 @@ const HotelAdminDashboard = () => {
                     </div>
                   </div>
                 </>
+              ) : (
+                <>
+                  {/* Hotel Information Section */}
+                  {hotel && (
+                    <HotelInfoForm hotel={hotel} onUpdate={updateHotel} />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === "restaurant" && (
+            <div className="space-y-6">
+              {!hasRestaurantEnabled ? (
+                <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center">
+                  <UtensilsCrossed className="h-8 w-8 text-neutral-300 mx-auto mb-3" />
+                  <p className="text-[13px] font-medium text-neutral-950">Restaurant is not enabled</p>
+                  <p className="text-[12px] text-neutral-500 mt-1">
+                    Enable "Has Restaurant" under Settings → General Setting to set one up.
+                  </p>
+                </div>
+              ) : hotel?.restaurantEmail ? (
+                <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center">
+                  <UtensilsCrossed className="h-8 w-8 text-emerald-500 mx-auto mb-3" />
+                  <p className="text-[13px] font-medium text-neutral-950">Restaurant already connected</p>
+                  <p className="text-[12px] text-neutral-500 mt-1">Redirecting you to Zhimpu...</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
+                  <div className="px-5 py-4 border-b border-neutral-100">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Restaurant</span>
+                    <h2 className="text-[15px] font-semibold text-neutral-950 leading-none mt-0.5">Register with Zhimpu</h2>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-medium text-neutral-700">
+                        Restaurant Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        name="restaurantName"
+                        value={restaurantForm.restaurantName}
+                        onChange={handleRestaurantFormChange}
+                        placeholder="Enter the restaurant's name"
+                        className={restaurantFormErrors.restaurantName ? "border-red-400" : ""}
+                      />
+                      {restaurantFormErrors.restaurantName && (
+                        <p className="text-red-500 text-[12px]">{restaurantFormErrors.restaurantName}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-medium text-neutral-700">
+                        License Number <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        name="licenseNo"
+                        value={restaurantForm.licenseNo}
+                        onChange={handleRestaurantFormChange}
+                        placeholder="e.g., BT-12345"
+                        className={restaurantFormErrors.licenseNo ? "border-red-400" : ""}
+                      />
+                      {restaurantFormErrors.licenseNo && (
+                        <p className="text-red-500 text-[12px]">{restaurantFormErrors.licenseNo}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-medium text-neutral-700">
+                        Address <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        name="address"
+                        value={restaurantForm.address}
+                        onChange={handleRestaurantFormChange}
+                        placeholder="Restaurant address"
+                        className={restaurantFormErrors.address ? "border-red-400" : ""}
+                      />
+                      {restaurantFormErrors.address && (
+                        <p className="text-red-500 text-[12px]">{restaurantFormErrors.address}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-medium text-neutral-700">
+                        TPN <span className="text-neutral-400 text-[11px] font-normal">(Optional)</span>
+                      </Label>
+                      <Input
+                        name="tpn"
+                        value={restaurantForm.tpn}
+                        onChange={handleRestaurantFormChange}
+                        placeholder="Tax Payer Number, if any"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[12px] font-medium text-neutral-700">
+                          Username <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          name="username"
+                          value={restaurantForm.username}
+                          onChange={handleRestaurantFormChange}
+                          placeholder="Login username for Zhimpu"
+                          autoComplete="off"
+                          className={restaurantFormErrors.username ? "border-red-400" : ""}
+                        />
+                        {restaurantFormErrors.username && (
+                          <p className="text-red-500 text-[12px]">{restaurantFormErrors.username}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[12px] font-medium text-neutral-700">
+                          Password <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            name="password"
+                            type={showRestaurantPassword ? "text" : "password"}
+                            value={restaurantForm.password}
+                            onChange={handleRestaurantFormChange}
+                            placeholder="At least 8 characters"
+                            autoComplete="new-password"
+                            className={`pr-9 ${restaurantFormErrors.password ? "border-red-400" : ""}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRestaurantPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                            aria-label={showRestaurantPassword ? "Hide password" : "Show password"}
+                            tabIndex={-1}
+                          >
+                            {showRestaurantPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                        {restaurantFormErrors.password && (
+                          <p className="text-red-500 text-[12px]">{restaurantFormErrors.password}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[12px] font-medium text-neutral-700">
+                          Email <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          name="email"
+                          type="email"
+                          value={restaurantForm.email}
+                          onChange={handleRestaurantFormChange}
+                          placeholder="admin@example.bt"
+                          className={restaurantFormErrors.email ? "border-red-400" : ""}
+                        />
+                        {restaurantFormErrors.email && (
+                          <p className="text-red-500 text-[12px]">{restaurantFormErrors.email}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[12px] font-medium text-neutral-700">
+                          Phone Number <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          name="phoneNumber"
+                          type="tel"
+                          value={restaurantForm.phoneNumber}
+                          onChange={handleRestaurantFormChange}
+                          placeholder="17123456"
+                          className={restaurantFormErrors.phoneNumber ? "border-red-400" : ""}
+                        />
+                        {restaurantFormErrors.phoneNumber && (
+                          <p className="text-red-500 text-[12px]">{restaurantFormErrors.phoneNumber}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end pt-2">
+                      <button
+                        type="button"
+                        onClick={handleRegisterRestaurant}
+                        disabled={submittingRestaurant}
+                        className="h-9 px-4 rounded-md bg-neutral-950 text-white text-[12px] font-medium hover:opacity-85 transition-opacity disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {submittingRestaurant ? <><Spinner size="sm" /> Registering...</> : "Register Restaurant"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -1987,6 +2607,8 @@ const HotelAdminDashboard = () => {
                 <AdminBookingForm
                   hotelId={currentHotelId}
                   hotelGst={hotel?.gst ?? false}
+                  hotelWalkInServiceChargeEnabled={hotel?.walkInServiceCharge ?? false}
+                  hotelWalkInServiceChargePercent={hotel?.walkInServiceChargePercent ?? 0}
                   onBookingSuccess={handleBookingSuccess}
                   isDisabled={isSubscriptionExpired()}
                 />
@@ -2007,6 +2629,7 @@ const HotelAdminDashboard = () => {
                     bookings={bookings}
                     onStatusChange={updateBookingStatus}
                     viewMode="compact"
+                    refreshSignal={bookingsRefreshSignal}
                   />
                 </div>
               </div>
