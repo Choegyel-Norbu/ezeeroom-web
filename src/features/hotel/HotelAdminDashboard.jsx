@@ -96,6 +96,7 @@ import {
 } from "@/shared/components/table";
 import HotelInfoForm from "./HotelInfoForm";
 import RoomManager from "../admin/RoomManager";
+import RoomTypeManager from "../admin/RoomTypeManager";
 import BookingTable from "./BookingTable";
 import CancellationRequestsTable from "./CancellationRequestsTable";
 import AdminBookingForm from "./AdminBookingForm";
@@ -174,6 +175,7 @@ const HotelAdminDashboard = () => {
   const [billingTab, setBillingTab] = useState("receipts");
   const [settingsSubTab, setSettingsSubTab] = useState("hotelInfo");
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [roomsSubTab, setRoomsSubTab] = useState("manage");
   const [notifyOnNewBooking, setNotifyOnNewBooking] = useState(true);
   const [notifyOnCancellation, setNotifyOnCancellation] = useState(true);
   const [gstEnabled, setGstEnabled] = useState(false);
@@ -1009,7 +1011,16 @@ const HotelAdminDashboard = () => {
       { id: "booking", label: "Booking", icon: Calendar, locked: false },
       ...(roles && !roles.includes("FRONTDESK") ? [
         { id: "inventory", label: "Bookings Inventory", icon: Package, locked: true },
-        { id: "rooms", label: "Room Management", icon: Bed, locked: true },
+        {
+        id: "rooms",
+        label: "Room Management",
+        icon: Bed,
+        locked: true,
+        subItems: [
+          { id: "manage", label: "Manage Rooms" },
+          { id: "types", label: "Room Type Config" },
+        ],
+      },
         ...(roles && !roles.includes("STAFF")
           ? [{ id: "staff", label: "Staff Management", icon: Users, locked: true }]
           : []),
@@ -1053,14 +1064,21 @@ const HotelAdminDashboard = () => {
     setActiveTab(item.id);
   };
 
-  const handleSettingsSubItemClick = (subItem) => {
-    setSettingsSubTab(subItem.id);
-    setActiveTab("hotel");
+  const handleNavSubItemClick = (item, subItem) => {
+    if (item.id === "rooms") {
+      setRoomsSubTab(subItem.id);
+    } else {
+      setSettingsSubTab(subItem.id);
+    }
+    setActiveTab(item.id);
   };
 
   const getPageTitle = () => {
     if (activeTab === "hotel") {
       return settingsSubTab === "general" ? "General Setting" : "Hotel Setting";
+    }
+    if (activeTab === "rooms" && roomsSubTab === "types") {
+      return "Room Type Config";
     }
     const titles = {
       dashboard: "Dashboard",
@@ -1077,6 +1095,9 @@ const HotelAdminDashboard = () => {
   };
 
   const getPageDescription = () => {
+    if (activeTab === "rooms" && roomsSubTab === "types") {
+      return "Configure the room types available for this hotel";
+    }
     const descriptions = {
       dashboard: "Overview of your hotel operations and recent activity",
       hotel: "Manage your hotel information and details",
@@ -1093,7 +1114,7 @@ const HotelAdminDashboard = () => {
     return descriptions[activeTab] || "Manage your hotel operations";
   };
 
-  const NavigationButton = ({ item, onClick, isActive, onSubItemClick }) => {
+  const NavigationButton = ({ item, onClick, isActive, onSubItemClick, activeSubTab }) => {
     const Icon = item.icon;
     const isLocked = item.locked && isSubscriptionExpired();
     const showLeaveBadge = item.id === "leave" && leaveNotificationCount > 0;
@@ -1141,7 +1162,7 @@ const HotelAdminDashboard = () => {
                 key={subItem.id}
                 onClick={() => onSubItemClick(subItem)}
                 className={`w-full flex items-center px-2.5 py-[6px] rounded-md text-[12.5px] font-medium transition-colors text-left ${
-                  settingsSubTab === subItem.id
+                  activeSubTab === subItem.id
                     ? "bg-neutral-100 text-neutral-950"
                     : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
                 }`}
@@ -1219,7 +1240,8 @@ const HotelAdminDashboard = () => {
                 item={item}
                 isActive={activeTab === item.id}
                 onClick={() => handleNavItemClick(item)}
-                onSubItemClick={handleSettingsSubItemClick}
+                activeSubTab={item.id === "rooms" ? roomsSubTab : settingsSubTab}
+                onSubItemClick={(subItem) => handleNavSubItemClick(item, subItem)}
               />
             ))}
           </div>
@@ -1455,8 +1477,9 @@ const HotelAdminDashboard = () => {
                               setMobileMenuOpen(false);
                             }
                           }}
+                          activeSubTab={item.id === "rooms" ? roomsSubTab : settingsSubTab}
                           onSubItemClick={(subItem) => {
-                            handleSettingsSubItemClick(subItem);
+                            handleNavSubItemClick(item, subItem);
                             setMobileMenuOpen(false);
                           }}
                         />
@@ -1763,7 +1786,11 @@ const HotelAdminDashboard = () => {
                 />
               ) : (
                 <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
-                  <RoomManager hotelId={currentHotelId} subscriptionPlan={subscriptionPlan} />
+                  {roomsSubTab === "types" ? (
+                    <RoomTypeManager hotelId={currentHotelId} />
+                  ) : (
+                    <RoomManager hotelId={currentHotelId} subscriptionPlan={subscriptionPlan} />
+                  )}
                 </div>
               )}
             </div>

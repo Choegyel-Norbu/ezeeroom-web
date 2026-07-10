@@ -1025,7 +1025,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
         bookingId: bookingResponse.id ?? bookingResponse.bookingId,
         hotelId: hotelId,
         hotelName: room?.hotelName ?? hotel?.name,
-        roomType: room?.roomType ?? room?.type,
+        roomType: room?.roomTypeName ?? room?.type,
         checkIn: bookingResponse.checkInDate,
         checkOut: bookingResponse.checkOutDate,
         nights: bookingResponse.numberOfNights,

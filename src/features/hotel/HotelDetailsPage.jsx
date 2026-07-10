@@ -1447,7 +1447,7 @@ const HotelDetailsPage = () => {
                                   : [`https://via.placeholder.com/500x300?text=Room+${room.roomNumber}`]
                               }
                               roomNumber={room.roomNumber}
-                              roomType={room.roomType}
+                              roomType={room.roomTypeName}
                               isActive={room.isActive}
                             />
                           </div>
@@ -1457,7 +1457,7 @@ const HotelDetailsPage = () => {
                               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                 <div className="space-y-2">
                                   <CardTitle className="text-xl">
-                                    {room.roomType} - Room {room.roomNumber}
+                                    {room.roomTypeName} - Room {room.roomNumber}
                                   </CardTitle>
                                   <CardDescription className="text-sm">
                                     - {room.description}

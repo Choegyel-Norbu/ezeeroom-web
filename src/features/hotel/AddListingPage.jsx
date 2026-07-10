@@ -43,6 +43,11 @@ import { setStorageItem } from "../../shared/utils/safariLocalStorage";
 
 const AddListingPage = () => {
   const [step, setStep] = useState(1);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [step]);
+
   const {
     email,
     userId,
@@ -1041,7 +1046,7 @@ const AddListingPage = () => {
                         if (errors.locality) setErrors(prev => { const e = { ...prev }; delete e.locality; return e; });
                       }}
                     >
-                      <SelectTrigger className={errors.district ? "border-red-400" : ""}>
+                      <SelectTrigger className={`w-full ${errors.district ? "border-red-400" : ""}`}>
                         <SelectValue placeholder="Select district" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1065,7 +1070,7 @@ const AddListingPage = () => {
                       }}
                       disabled={!formData.district}
                     >
-                      <SelectTrigger className={errors.locality ? "border-red-400" : ""}>
+                      <SelectTrigger className={`w-full ${errors.locality ? "border-red-400" : ""}`}>
                         <SelectValue placeholder={formData.district ? "Select town/locality" : "Select district first"} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1203,7 +1208,7 @@ const AddListingPage = () => {
                           if (errors.hotelType) setErrors(prev => { const e = { ...prev }; delete e.hotelType; return e; });
                         }}
                       >
-                        <SelectTrigger className={errors.hotelType ? "border-red-400" : ""}>
+                        <SelectTrigger className={`w-full ${errors.hotelType ? "border-red-400" : ""}`}>
                           <SelectValue placeholder="Select hotel type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1421,7 +1426,6 @@ const AddListingPage = () => {
                           value={formData.cancellationPolicy}
                           onChange={handleChange}
                           rows={4}
-                          placeholder="e.g., Free cancellation up to 24 hours before check-in. Cancellations within 24 hours will be charged 50% of the total amount. No-shows charged in full."
                           className={`resize-none text-[13px] ${errors.cancellationPolicy ? "border-red-400" : ""}`}
                         />
                         <div className="bg-neutral-50 rounded-md p-3 border border-neutral-200">
@@ -1493,7 +1497,7 @@ const AddListingPage = () => {
                         if (errors.bankType) setErrors(prev => { const e = { ...prev }; delete e.bankType; return e; });
                       }}
                     >
-                      <SelectTrigger className={errors.bankType ? "border-red-400" : ""}>
+                      <SelectTrigger className={`w-full ${errors.bankType ? "border-red-400" : ""}`}>
                         <SelectValue placeholder="Select bank" />
                       </SelectTrigger>
                       <SelectContent>

@@ -173,6 +173,8 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
         Guests: b.guests,
         Status: b.status,
         "Transfer Status": b.transferStatus || "N/A",
+        "Payment Method": b.paymentMethod || "N/A",
+        "Journal Number": b.journalNumber || "N/A",
         "Total Price": b.totalPrice,
         Origin: b.origin,
         Destination: b.destination,
@@ -385,7 +387,12 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
                     <TableCell className="px-4 py-3">
                       <div className="space-y-1">
                         <StatusChip status={booking.transferStatus} styleMap={TRANSFER_STATUS_STYLES} />
-                        {booking.journalNumber && (
+                        {booking.paymentMethod && (
+                          <div className="text-[11px] text-neutral-500">
+                            {booking.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : "Cash"}
+                          </div>
+                        )}
+                        {booking.paymentMethod === "BANK_TRANSFER" && booking.journalNumber && (
                           <div className="text-[11px] text-neutral-400">#{booking.journalNumber}</div>
                         )}
                       </div>

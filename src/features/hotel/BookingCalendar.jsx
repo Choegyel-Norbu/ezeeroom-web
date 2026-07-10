@@ -374,7 +374,7 @@ const BookingCalendar = ({ hotelId }) => {
                   <SelectItem value="all">All Rooms</SelectItem>
                   {rooms.map((room) => (
                     <SelectItem key={room.id} value={room.id.toString()}>
-                      Room {room.roomNumber} — {room.roomType}
+                      Room {room.roomNumber} — {room.roomTypeName}
                     </SelectItem>
                   ))}
                 </SelectContent>

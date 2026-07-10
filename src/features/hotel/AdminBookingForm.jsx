@@ -66,6 +66,8 @@ export default function AdminBookingForm({
   const [errors, setErrors] = useState({});
   const [discountAmount, setDiscountAmount] = useState("");
   const [waiveWalkInServiceCharge, setWaiveWalkInServiceCharge] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [journalNumber, setJournalNumber] = useState("");
 
   // Get selected room for time-based booking hook
   const selectedRoomForHook = availableRooms.find(room => room.roomNumber === bookingDetails.roomNumber);
@@ -901,6 +903,9 @@ export default function AdminBookingForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formErrors = validateForm();
+    if (paymentMethod === "BANK_TRANSFER" && !journalNumber.trim()) {
+      formErrors.journalNumber = "Journal number is required for bank transfer";
+    }
     if (Object.keys(formErrors).length > 0) {
       if (isTimeBasedBooking) {
         setTimeBasedErrors(formErrors);
@@ -942,6 +947,8 @@ export default function AdminBookingForm({
           initiatePayment: false, // Admin bookings don't initiate payment
           discountAmount: parseFloat(discountAmount) || undefined,
           waiveWalkInServiceCharge,
+          paymentMethod,
+          journalNumber: paymentMethod === "BANK_TRANSFER" ? journalNumber.trim() : undefined,
         };
       } else {
         // Regular booking payload
@@ -962,6 +969,8 @@ export default function AdminBookingForm({
           adminBooking: true,
           discountAmount: parseFloat(discountAmount) || undefined,
           waiveWalkInServiceCharge,
+          paymentMethod,
+          journalNumber: paymentMethod === "BANK_TRANSFER" ? journalNumber.trim() : undefined,
         };
       }
 
@@ -1000,6 +1009,8 @@ export default function AdminBookingForm({
         setTimeBasedErrors({});
         setDiscountAmount("");
         setWaiveWalkInServiceCharge(false);
+        setPaymentMethod("CASH");
+        setJournalNumber("");
         setOpenBookingDialog(false);
         
         // Only call onBookingSuccess to refresh data - avoid multiple API calls
@@ -1120,7 +1131,7 @@ export default function AdminBookingForm({
                     {availableRooms.length > 0 ? (
                       availableRooms.map((room) => (
                         <SelectItem key={room.id} value={room.roomNumber}>
-                          Room {room.roomNumber} - {room.roomType} (Nu. {room.price}/night)
+                          Room {room.roomNumber} - {room.roomTypeName} (Nu. {room.price}/night)
                         </SelectItem>
                       ))
                     ) : (
@@ -1590,6 +1601,44 @@ export default function AdminBookingForm({
                     />
                   </div>
                 )}
+
+                <div className="grid gap-2" data-field="paymentMethod">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={(value) => {
+                      setPaymentMethod(value);
+                      if (value !== "BANK_TRANSFER") setJournalNumber("");
+                    }}
+                  >
+                    <SelectTrigger id="paymentMethod" className="h-10">
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Cash</SelectItem>
+                      <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {paymentMethod === "BANK_TRANSFER" && (
+                  <div className="grid gap-2" data-field="journalNumber">
+                    <Label htmlFor="journalNumber">Journal Number</Label>
+                    <Input
+                      id="journalNumber"
+                      type="text"
+                      value={journalNumber}
+                      onChange={(e) => setJournalNumber(e.target.value)}
+                      placeholder="Enter bank transfer journal number"
+                      className="h-10"
+                    />
+                    {(isTimeBasedBooking ? timeBasedErrors.journalNumber : errors.journalNumber) && (
+                      <p className="text-sm text-destructive">
+                        {isTimeBasedBooking ? timeBasedErrors.journalNumber : errors.journalNumber}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Separator className="my-2" />
@@ -1696,7 +1745,7 @@ export default function AdminBookingForm({
                       )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Room Type</span>
-                        <span className="font-medium">{selectedRoom.roomType}</span>
+                        <span className="font-medium">{selectedRoom.roomTypeName}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Price per night</span>

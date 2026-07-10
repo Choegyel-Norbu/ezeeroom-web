@@ -17,11 +17,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   TrendingUp,
-  Download,
+  Printer,
+  CreditCard,
 } from "lucide-react";
 
 import api from "../../shared/services/Api";
-import { generateBookingReceipt } from "../../shared/utils/receiptGenerator";
+import { printBookingReceipt } from "../../shared/utils/receiptPrint";
 
 import {
   Table,
@@ -56,6 +57,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components";
+import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components";
 
 // --- Helpers ---
 
@@ -130,6 +132,12 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
+
+  const [editingPaymentBooking, setEditingPaymentBooking] = useState(null);
+  const [editPaymentMethod, setEditPaymentMethod] = useState("CASH");
+  const [editJournalNumber, setEditJournalNumber] = useState("");
+  const [editDiscountAmount, setEditDiscountAmount] = useState("");
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -258,16 +266,81 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
     }
   };
 
-  const handleDownloadReceipt = async (bookingId) => {
+  const handlePrintReceipt = async (booking) => {
     try {
-      const response = await api.get(`/receipts/booking/${bookingId}`);
+      const response = await api.get(`/receipts/booking/${booking.id}`);
       if (response.status === 200 && response.data && response.data.length > 0) {
-        await generateBookingReceipt({ id: bookingId, bookingId }, response.data[0]);
+        await printBookingReceipt(booking, response.data[0]);
       } else {
         toast.error("No receipt found for this booking.");
       }
     } catch {
-      toast.error("Failed to download receipt.");
+      toast.error("Failed to print receipt.");
+    }
+  };
+
+  const openPaymentEdit = (booking) => {
+    setEditingPaymentBooking(booking);
+    setEditPaymentMethod(booking.paymentMethod || "CASH");
+    setEditJournalNumber(booking.journalNumber || "");
+    setEditDiscountAmount(booking.discountAmount ? String(booking.discountAmount) : "");
+  };
+
+  const closePaymentEdit = () => {
+    setEditingPaymentBooking(null);
+    setEditPaymentMethod("CASH");
+    setEditJournalNumber("");
+    setEditDiscountAmount("");
+    setIsSavingPayment(false);
+  };
+
+  const handlePaymentEditSubmit = async () => {
+    if (editPaymentMethod === "BANK_TRANSFER" && !editJournalNumber.trim()) {
+      toast.error("Please enter a journal number for bank transfer.");
+      return;
+    }
+
+    try {
+      setIsSavingPayment(true);
+      await api.put(`/bookings/${editingPaymentBooking.id}/transfer-details`, null, {
+        params: {
+          journalNumber: editPaymentMethod === "BANK_TRANSFER" ? editJournalNumber.trim() : undefined,
+          transferStatus: "DEPOSITED",
+          paymentMethod: editPaymentMethod,
+        },
+      });
+
+      if (editingPaymentBooking.adminBooking) {
+        await api.put(`/bookings/${editingPaymentBooking.id}/discount`, null, {
+          params: {
+            discountAmount: parseFloat(editDiscountAmount) || 0,
+          },
+        });
+      }
+
+      toast.success(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+          Payment details updated successfully.
+        </div>,
+        { duration: 5000 }
+      );
+
+      if (isSearchMode && lastSearchedQuery) {
+        searchBookingsByRoom(lastSearchedQuery, currentPage);
+      } else {
+        fetchBookings(currentPage);
+      }
+      closePaymentEdit();
+    } catch (err) {
+      toast.error(
+        <div className="flex items-center gap-2">
+          <XCircle className="h-5 w-5 text-red-500" />
+          {err.response?.data?.message || "Failed to update payment details. Please try again."}
+        </div>,
+        { duration: 6000 }
+      );
+      setIsSavingPayment(false);
     }
   };
 
@@ -448,8 +521,19 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
 
                 {/* Guest Info */}
                 <TableCell className="px-4 py-3">
-                  <div className="text-[13px] font-medium text-neutral-950 leading-tight">
-                    {booking.guestName || booking.name || 'Not provided'}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[13px] font-medium text-neutral-950 leading-tight">
+                      {booking.guestName || booking.name || 'Not provided'}
+                    </span>
+                    <span
+                      className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0 ${
+                        booking.adminBooking
+                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                    >
+                      {booking.adminBooking ? "Walk-in" : "Online"}
+                    </span>
                   </div>
                   <div className="text-[12px] text-neutral-400 mt-0.5">{booking.email}</div>
                 </TableCell>
@@ -514,18 +598,21 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
                   <span className="text-[13px] font-semibold text-neutral-950 tabular-nums">
                     Nu. {new Intl.NumberFormat("en-IN").format(booking.txnTotalPrice ?? booking.totalPrice)}
                   </span>
+                  {booking.paymentMethod && (
+                    <div className="text-[11px] text-neutral-500 mt-0.5">
+                      {booking.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : "Cash"}
+                    </div>
+                  )}
+                  {booking.paymentMethod === "BANK_TRANSFER" && booking.journalNumber && (
+                    <div className="text-[11px] text-neutral-400 mt-0.5">
+                      Jr no: {booking.journalNumber}
+                    </div>
+                  )}
                 </TableCell>
 
                 {/* Transfer Status */}
                 <TableCell className="px-4 py-3">
-                  <div className="flex flex-col gap-1">
-                    <StatusChip status={booking.transferStatus} />
-                    {booking.journalNumber && (
-                      <div className="text-[11px] text-neutral-400 mt-0.5">
-                        #{booking.journalNumber}
-                      </div>
-                    )}
-                  </div>
+                  <StatusChip status={booking.transferStatus} />
                 </TableCell>
 
                 {/* Status */}
@@ -546,9 +633,12 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
                       <DropdownMenuItem onClick={() => setSelectedBooking(booking)}>
                         <Info className="h-4 w-4 mr-2" /> View Details
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePrintReceipt(booking)}>
+                        <Printer className="h-4 w-4 mr-2" /> Print Receipt
+                      </DropdownMenuItem>
                       {booking.adminBooking && (
-                        <DropdownMenuItem onClick={() => handleDownloadReceipt(booking.id)}>
-                          <Download className="h-4 w-4 mr-2" /> Download Receipt
+                        <DropdownMenuItem onClick={() => openPaymentEdit(booking)}>
+                          <CreditCard className="h-4 w-4 mr-2" /> Edit Payment
                         </DropdownMenuItem>
                       )}
                       {booking.status === "PENDING" && (
@@ -668,7 +758,10 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
                       selectedBooking.passportNumber ? "Passport" : "CID",
                       selectedBooking.cid || selectedBooking.passportNumber || 'Not provided',
                     ],
-                    ["Journal No.", selectedBooking.journalNumber || 'Not provided'],
+                    ["Payment Method", selectedBooking.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : selectedBooking.paymentMethod === "CASH" ? "Cash" : 'Not provided'],
+                    ...(selectedBooking.paymentMethod === "BANK_TRANSFER"
+                      ? [["Journal No.", selectedBooking.journalNumber || 'Not provided']]
+                      : []),
                     ["Guests", selectedBooking.guests],
                   ].map(([label, value]) => (
                     <div key={label} className="flex items-center justify-between gap-4">
@@ -844,6 +937,80 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
               >
                 Close
               </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Payment Dialog */}
+      {editingPaymentBooking && (
+        <Dialog open={!!editingPaymentBooking} onOpenChange={(open) => !open && closePaymentEdit()}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Payment</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editPaymentMethod">Payment Method</Label>
+                <Select
+                  value={editPaymentMethod}
+                  onValueChange={(value) => {
+                    setEditPaymentMethod(value);
+                    if (value !== "BANK_TRANSFER") setEditJournalNumber("");
+                  }}
+                >
+                  <SelectTrigger id="editPaymentMethod">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editPaymentMethod === "BANK_TRANSFER" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="editJournalNumber">Journal Number</Label>
+                  <Input
+                    id="editJournalNumber"
+                    type="text"
+                    value={editJournalNumber}
+                    onChange={(e) => setEditJournalNumber(e.target.value)}
+                    placeholder="Enter journal number"
+                    maxLength={50}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {editingPaymentBooking.adminBooking && (
+                <div className="grid gap-2">
+                  <Label htmlFor="editDiscountAmount">Discount (Nu.)</Label>
+                  <Input
+                    id="editDiscountAmount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editDiscountAmount}
+                    onChange={(e) => setEditDiscountAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={closePaymentEdit} disabled={isSavingPayment}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePaymentEditSubmit}
+                disabled={isSavingPayment || (editPaymentMethod === "BANK_TRANSFER" && !editJournalNumber.trim())}
+              >
+                {isSavingPayment ? "Saving..." : "Save"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -181,6 +181,7 @@ const SuperAdmin = () => {
   // Transfer form states
   const [selectedBookingForTransfer, setSelectedBookingForTransfer] = useState(null);
   const [journalNumber, setJournalNumber] = useState("");
+  const [transferPaymentMethod, setTransferPaymentMethod] = useState("CASH");
   const [isTransferring, setIsTransferring] = useState(false);
 
   // Extension form states
@@ -1023,12 +1024,14 @@ const SuperAdmin = () => {
   // Transfer form handlers
   const handleTransferSelect = (booking) => {
     setSelectedBookingForTransfer(booking);
-    setJournalNumber("");
+    setJournalNumber(booking.journalNumber || "");
+    setTransferPaymentMethod(booking.paymentMethod || "CASH");
   };
 
   const handleTransferCancel = () => {
     setSelectedBookingForTransfer(null);
     setJournalNumber("");
+    setTransferPaymentMethod("CASH");
     setIsTransferring(false);
   };
 
@@ -1079,9 +1082,9 @@ const SuperAdmin = () => {
   };
 
   const handleTransferSubmit = async () => {
-    if (!journalNumber.trim()) {
+    if (transferPaymentMethod === "BANK_TRANSFER" && !journalNumber.trim()) {
       toast.error("Please enter journal number", {
-        description: "The journal number field cannot be empty.",
+        description: "The journal number field cannot be empty for bank transfer.",
         icon: <XCircle className="text-red-600" />,
         duration: 4000,
       });
@@ -1099,20 +1102,23 @@ const SuperAdmin = () => {
 
     try {
       setIsTransferring(true);
-      
+
       // Call the transfer endpoint for bookings
       const bookingId = selectedBookingForTransfer.id;
       const transferStatus = 'DEPOSITED'; // Default status as per requirement
-      
+
       await api.put(`/bookings/${bookingId}/transfer-details`, null, {
         params: {
-          journalNumber: journalNumber.trim(),
-          transferStatus: transferStatus
+          journalNumber: transferPaymentMethod === "BANK_TRANSFER" ? journalNumber.trim() : undefined,
+          transferStatus: transferStatus,
+          paymentMethod: transferPaymentMethod
         }
       });
 
-      toast.success("Transfer Completed", {
-        description: `Transfer details updated for booking "${selectedBookingForTransfer.guestName}" with journal number: ${journalNumber.trim()}`,
+      toast.success("Payment Details Updated", {
+        description: transferPaymentMethod === "BANK_TRANSFER"
+          ? `Booking "${selectedBookingForTransfer.guestName}" marked as paid via bank transfer, journal number: ${journalNumber.trim()}`
+          : `Booking "${selectedBookingForTransfer.guestName}" marked as paid via cash.`,
         icon: <CheckCircle className="text-green-600" />,
         duration: 5000,
       });
@@ -1236,7 +1242,12 @@ const SuperAdmin = () => {
                   >
                     {booking.transferStatus || "N/A"}
                   </Badge>
-                  {booking.journalNumber && (
+                  {booking.paymentMethod && (
+                    <div className="text-xs text-muted-foreground">
+                      Method: {booking.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : "Cash"}
+                    </div>
+                  )}
+                  {booking.paymentMethod === "BANK_TRANSFER" && booking.journalNumber && (
                     <div className="text-xs text-muted-foreground">
                       Journal: {booking.journalNumber}
                     </div>
@@ -1767,22 +1778,44 @@ const SuperAdmin = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="md:col-span-2">
-              <Label htmlFor="journalNumber" className="text-sm font-medium text-blue-800">
-                Journal Number
+            <div>
+              <Label htmlFor="transferPaymentMethod" className="text-sm font-medium text-blue-800">
+                Payment Method
               </Label>
-              <Input
-                id="journalNumber"
-                type="text"
-                placeholder="Enter journal number (e.g., JN123456)"
-                value={journalNumber}
-                onChange={(e) => setJournalNumber(e.target.value)}
-                className="mt-1 border-blue-300 focus:border-blue-500 focus:ring-blue-500"
-                maxLength={50}
-                autoComplete="off"
-                autoFocus
-              />
+              <Select
+                value={transferPaymentMethod}
+                onValueChange={(value) => {
+                  setTransferPaymentMethod(value);
+                  if (value !== "BANK_TRANSFER") setJournalNumber("");
+                }}
+              >
+                <SelectTrigger id="transferPaymentMethod" className="mt-1 border-blue-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {transferPaymentMethod === "BANK_TRANSFER" && (
+              <div>
+                <Label htmlFor="journalNumber" className="text-sm font-medium text-blue-800">
+                  Journal Number
+                </Label>
+                <Input
+                  id="journalNumber"
+                  type="text"
+                  placeholder="Enter journal number (e.g., JN123456)"
+                  value={journalNumber}
+                  onChange={(e) => setJournalNumber(e.target.value)}
+                  className="mt-1 border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                  maxLength={50}
+                  autoComplete="off"
+                  autoFocus
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -1794,14 +1827,14 @@ const SuperAdmin = () => {
               </Button>
               <Button
                 onClick={handleTransferSubmit}
-                disabled={!journalNumber.trim() || isTransferring}
+                disabled={(transferPaymentMethod === "BANK_TRANSFER" && !journalNumber.trim()) || isTransferring}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                {isTransferring ? "Updating..." : "Update Transfer"}
+                {isTransferring ? "Updating..." : "Update Payment"}
               </Button>
             </div>
           </div>
-          
+
           {/* Booking Details */}
           <div className="mt-4 p-3 bg-white rounded-md border border-blue-200">
             <h4 className="text-sm font-medium text-gray-800 mb-2">Booking Details:</h4>
@@ -3642,6 +3675,7 @@ const SuperAdmin = () => {
           "Extension": booking.extension ? "Yes" : "No",
           "Extension Amount": booking.extendedAmount ? `Nu. ${booking.extendedAmount}` : "N/A",
           "Journal Number": booking.journalNumber || "N/A",
+          "Payment Method": booking.paymentMethod || "N/A",
           "Booking Status": booking.status || "UNKNOWN",
           "Payment URL": booking.paymentUrl || "N/A",
           "Created Date": booking.createdAt ? format(new Date(booking.createdAt), "dd MMM yyyy") : "N/A",
@@ -3821,7 +3855,12 @@ const SuperAdmin = () => {
                             Order: {booking.orderNumber}
                           </div>
                         )}
-                        {booking.journalNumber && (
+                        {booking.paymentMethod && (
+                          <div className="text-xs text-muted-foreground">
+                            Method: {booking.paymentMethod === "BANK_TRANSFER" ? "Bank Transfer" : "Cash"}
+                          </div>
+                        )}
+                        {booking.paymentMethod === "BANK_TRANSFER" && booking.journalNumber && (
                           <div className="text-xs font-medium text-purple-600">
                             Journal: {booking.journalNumber}
                           </div>

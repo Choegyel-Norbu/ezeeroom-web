@@ -99,8 +99,6 @@ const standardAmenities = [
   { id: 28, name: "Work Desk",                               icon: Lightbulb },
 ];
 
-const roomTypeOptions = ["SINGLE", "DOUBLE", "DELUXE", "SUITE", "FAMILY", "TWIN", "KING", "QUEEN"];
-
 const bedTypeOptions = ["SINGLE", "TWIN", "DOUBLE", "QUEEN", "KING", "BUNK", "SOFA_BED"];
 const bedTypeCapacity = { SINGLE: 1, TWIN: 1, DOUBLE: 2, QUEEN: 2, KING: 2, BUNK: 2, SOFA_BED: 1 };
 const bedTypeLabels = {
@@ -124,6 +122,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
   const [editingRoom, setEditingRoom]         = useState(null);
   const [roomAdded, setRoomAdded]             = useState(false);
   const [rooms, setRooms]                     = useState([]);
+  const [roomTypes, setRoomTypes]             = useState([]);
   const [loading, setLoading]                 = useState(true);
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [deletionDialogOpen, setDeletionDialogOpen] = useState(false);
@@ -132,7 +131,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
   const formRef = useRef(null);
 
   const [roomForm, setRoomForm] = useState({
-    roomType: "", price: "", roomNumber: "", maxGuests: "",
+    roomTypeId: "", price: "", roomNumber: "", maxGuests: "",
     active: true, description: "", images: [], amenities: [],
     bedConfigurations: [], mealPlans: [],
   });
@@ -140,7 +139,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
   const validateField = (name, value) => {
     switch (name) {
-      case "roomType":   return value ? "" : "Room type is required";
+      case "roomTypeId": return value ? "" : "Room type is required";
       case "price":      return !value ? "Price is required" : isNaN(value) || value <= 0 ? "Price must be a positive number" : "";
       case "roomNumber": return value ? "" : "Room number is required";
       case "maxGuests":  return !value ? "Max guests is required" : isNaN(value) || value <= 0 || value > 10 ? "Max guests must be 1–10" : "";
@@ -152,7 +151,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
   const validateForm = () => {
     const newErrors = {
-      roomType:    validateField("roomType",    roomForm.roomType),
+      roomTypeId:  validateField("roomTypeId",  roomForm.roomTypeId),
       price:       validateField("price",       roomForm.price),
       roomNumber:  validateField("roomNumber",  roomForm.roomNumber),
       maxGuests:   validateField("maxGuests",   roomForm.maxGuests),
@@ -176,7 +175,16 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
         setLoading(false);
       }
     };
+    const fetchRoomTypes = async () => {
+      try {
+        const response = await api.get(`/hotels/${hotelId}/room-types`);
+        setRoomTypes(response.data);
+      } catch {
+        toast.error("Failed to load room types", { duration: 6000 });
+      }
+    };
     fetchRooms();
+    fetchRoomTypes();
   }, [hotelId]);
 
   useEffect(() => {
@@ -190,7 +198,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
       const roomToEdit = rooms.find((room) => room.id === editingRoom);
       if (roomToEdit) {
         setRoomForm({
-          roomType:    roomToEdit.roomType || "",
+          roomTypeId:  roomToEdit.roomTypeId != null ? String(roomToEdit.roomTypeId) : "",
           price:       roomToEdit.price || "",
           roomNumber:  roomToEdit.roomNumber || "",
           maxGuests:   roomToEdit.maxGuests || "",
@@ -209,7 +217,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
   const resetForm = () => {
     setRoomForm({
-      roomType: "", price: "", roomNumber: "", maxGuests: "", active: true, description: "", images: [], amenities: [],
+      roomTypeId: "", price: "", roomNumber: "", maxGuests: "", active: true, description: "", images: [], amenities: [],
       bedConfigurations: [], mealPlans: [],
     });
     setErrors({});
@@ -320,11 +328,16 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
       const uploadResults = await Promise.all(roomForm.images.filter((img) => img.isNew && img.file).map((img) => uploadFile(img.file, "photos")));
       const existingImageUrls = roomForm.images.filter((img) => img.isExisting).map((img) => img.url);
       const newImageUrls = uploadResults.filter((res) => res.field === "photos" && res.url).map((res) => res.url);
-      const payload = { ...roomForm, imageUrl: [...existingImageUrls, ...newImageUrls], amenities: roomForm.amenities.map((a) => a.name) };
+      const payload = {
+        ...roomForm,
+        roomTypeId: Number(roomForm.roomTypeId),
+        imageUrl: [...existingImageUrls, ...newImageUrls],
+        amenities: roomForm.amenities.map((a) => a.name),
+      };
       if (editingRoom) {
-        await api.put(`/rooms/${editingRoom}`, payload);
+        const response = await api.put(`/rooms/${editingRoom}`, payload);
         toast.success("Room updated successfully!", { duration: 6000 });
-        setRooms((prev) => prev.map((room) => room.id === editingRoom ? { ...room, ...payload, id: editingRoom, amenities: payload.amenities } : room));
+        setRooms((prev) => prev.map((room) => room.id === editingRoom ? response.data : room));
       } else {
         const response = await api.post(`/rooms/hotel/${hotelId}`, payload);
         toast.success("Room added successfully!", { duration: 6000 });
@@ -399,39 +412,38 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
           <form onSubmit={handleSubmit} ref={formRef} className="flex flex-col flex-1 min-h-0">
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-              {/* Row 1: Type + Price */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5" data-field="roomType">
-                  <label className="text-[12px] font-medium text-neutral-600">
-                    Room Type <span className="text-red-500">*</span>
-                  </label>
-                  <Select value={roomForm.roomType} onValueChange={(v) => handleSelectChange("roomType", v)}>
-                    <SelectTrigger className={`h-9 text-[13px] border-neutral-200 bg-neutral-50 shadow-none ${errors.roomType ? "border-red-400" : ""}`}>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roomTypeOptions.map((type) => (
-                        <SelectItem key={type} value={type} className="text-[13px]">
-                          {type.charAt(0) + type.slice(1).toLowerCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.roomType && <p className="text-[11px] text-red-500">{errors.roomType}</p>}
-                </div>
+              {/* Row 1: Type */}
+              <div className="space-y-1.5" data-field="roomTypeId">
+                <label className="text-[12px] font-medium text-neutral-600">
+                  Room Type <span className="text-red-500">*</span>
+                </label>
+                <Select value={roomForm.roomTypeId} onValueChange={(v) => handleSelectChange("roomTypeId", v)}>
+                  <SelectTrigger className={`w-full h-9 text-[13px] border-neutral-200 bg-neutral-50 shadow-none ${errors.roomTypeId ? "border-red-400" : ""}`}>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomTypes.map((type) => (
+                      <SelectItem key={type.id} value={String(type.id)} className="text-[13px]">
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.roomTypeId && <p className="text-[11px] text-red-500">{errors.roomTypeId}</p>}
+              </div>
 
-                <div className="space-y-1.5" data-field="price">
-                  <label className="text-[12px] font-medium text-neutral-600">
-                    Price / night (Nu.) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    name="price" type="number" min="0" step="1"
-                    value={roomForm.price} onChange={handleInputChange}
-                    placeholder="0"
-                    className={`w-full h-9 rounded-md border px-3 text-[13px] text-neutral-900 bg-neutral-50 outline-none focus:border-neutral-400 transition-colors tabular-nums ${errors.price ? "border-red-400" : "border-neutral-200"}`}
-                  />
-                  {errors.price && <p className="text-[11px] text-red-500">{errors.price}</p>}
-                </div>
+              {/* Row 2: Price */}
+              <div className="space-y-1.5" data-field="price">
+                <label className="text-[12px] font-medium text-neutral-600">
+                  Price / night (Nu.) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="price" type="number" min="0" step="1"
+                  value={roomForm.price} onChange={handleInputChange}
+                  placeholder="0"
+                  className={`w-full h-9 rounded-md border px-3 text-[13px] text-neutral-900 bg-neutral-50 outline-none focus:border-neutral-400 transition-colors tabular-nums ${errors.price ? "border-red-400" : "border-neutral-200"}`}
+                />
+                {errors.price && <p className="text-[11px] text-red-500">{errors.price}</p>}
               </div>
 
               {/* Row 2: Room Number + Max Guests */}
@@ -741,7 +753,7 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
 
                 <TableCell className="px-4 py-3">
                   <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-700">
-                    {room.roomType}
+                    {room.roomTypeName}
                   </span>
                 </TableCell>
 

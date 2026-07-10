@@ -336,7 +336,7 @@ export default function TimeBasedBookingDialog({
         amount: bookingResponse.txnTotalPrice ?? bookingResponse.totalPrice,
         bookingId: bookingResponse.id ?? bookingResponse.bookingId,
         hotelName: room?.hotelName ?? hotel?.name,
-        roomType: room?.roomType ?? room?.type,
+        roomType: room?.roomTypeName ?? room?.type,
         checkIn: bookingResponse.checkInDate,
         checkOut: bookingResponse.checkOutDate,
         nights: bookingResponse.numberOfNights,
