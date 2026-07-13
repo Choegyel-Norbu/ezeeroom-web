@@ -217,7 +217,7 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
   const itemDescription = receiptData.description || (isBooking ? 'Booking Payment' : 'Subscription Payment');
   const gstAmount = parseFloat(receiptData.gstAmount || 0);
   const serviceTaxAmount = parseFloat(receiptData.serviceTaxAmount || 0);
-  const walkInServiceChargeAmount = parseFloat(receiptData.walkInServiceChargeAmount || 0);
+  const walkInServiceChargeAmount = Math.abs(parseFloat(receiptData.walkInServiceChargeAmount || 0));
   const discountAmount = parseFloat(receiptData.discountAmount || 0);
   const hasTaxBreakdown = isBooking && receiptData.baseAmount != null &&
     (gstAmount > 0 || serviceTaxAmount > 0 || walkInServiceChargeAmount > 0 || discountAmount > 0);

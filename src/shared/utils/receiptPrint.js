@@ -58,7 +58,7 @@ const buildLineItems = (receiptData) => {
   const baseAmount = receiptData.baseAmount;
   const gstAmount = parseFloat(receiptData.gstAmount || 0);
   const serviceTaxAmount = parseFloat(receiptData.serviceTaxAmount || 0);
-  const walkInServiceChargeAmount = parseFloat(receiptData.walkInServiceChargeAmount || 0);
+  const walkInServiceChargeAmount = Math.abs(parseFloat(receiptData.walkInServiceChargeAmount || 0));
   const discountAmount = parseFloat(receiptData.discountAmount || 0);
   const hasBreakdown = baseAmount != null &&
     (gstAmount > 0 || serviceTaxAmount > 0 || walkInServiceChargeAmount > 0 || discountAmount > 0);
@@ -130,7 +130,7 @@ const buildReceiptHtml = (booking, receiptData) => {
 <title>Receipt ${escapeHtml(receiptData.receiptNumber || '')}</title>
 <style>
   @page { size: A4; margin: 14mm 12mm; }
-  *{ box-sizing:border-box; }
+  *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
@@ -158,16 +158,16 @@ const buildReceiptHtml = (booking, receiptData) => {
     color:#7d7566; padding:12px 0 4px;
   }
   table.block{ width:100%; border-collapse:collapse; font-size:12.5px; margin:0 0 14px; }
-  table.block td{ border:1px solid #ccc3ae; padding:7px 10px; vertical-align:top; }
+  table.block td{ border:1px solid #999083; padding:7px 10px; vertical-align:top; }
   .lbl{ display:block; font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:#7d7566; margin-bottom:3px; }
   .val{ font-weight:600; }
   .val.mono{ font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; font-weight:600; }
   table.ledger{ width:100%; border-collapse:collapse; font-size:12.5px; margin:4px 0 0; }
   table.ledger th{
     background:#f4e9e2; color:#7c2e2b; font-size:10px; letter-spacing:.05em; text-transform:uppercase;
-    text-align:left; padding:8px 10px; border:1px solid #ccc3ae;
+    text-align:left; padding:8px 10px; border:1px solid #999083;
   }
-  table.ledger td{ border:1px solid #ccc3ae; padding:7px 10px; }
+  table.ledger td{ border:1px solid #999083; padding:7px 10px; }
   table.ledger td.num, table.ledger th.num{
     text-align:right; font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums;
   }
