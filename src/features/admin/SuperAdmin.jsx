@@ -405,7 +405,7 @@ const SuperAdmin = () => {
   useEffect(() => {
     const fetchHotelOptions = async () => {
       try {
-        const params = { page: 0, size: 1000 };
+        const params = { page: 0, size: 15 };
         const response = await api.get("/hotels/superAdmin", { params });
         setHotelOptions(response.data.content || []);
       } catch {
@@ -494,7 +494,7 @@ const SuperAdmin = () => {
         setHotels(response.data.content);
         setPagination((prev) => ({
           ...prev,
-          totalPages: response.data.totalPages,
+          totalPages: response.data.page?.totalPages || 1,
         }));
         setError(null);
       } catch (err) {
@@ -608,9 +608,9 @@ const SuperAdmin = () => {
         setHotels(response.data.content || []);
         setPagination((prev) => ({
           ...prev,
-          totalPages: response.data.totalPages || 1,
+          totalPages: response.data.page?.totalPages || 1,
         }));
-        
+
         handleDenyHotelCancel();
       }
     } catch (err) {

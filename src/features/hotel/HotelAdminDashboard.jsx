@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  ExternalLink,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/ios-spinner";
 import {
@@ -403,7 +404,7 @@ const HotelAdminDashboard = () => {
       try {
         fetchingLeaveNotificationsRef.current = true;
         setLoadingLeaveNotifications(true);
-        const response = await api.get(`/leaves/notifications`);
+        const response = await api.get(`/leaves/notifications/hotel/${currentHotelId}`);
         
         // API returns an array of notification objects with structure:
         // { id, username, roomNumber, guestName, hotelName, hotelId, title, message, type, isRead, createdAt }
@@ -2437,8 +2438,23 @@ const HotelAdminDashboard = () => {
               ) : hotel?.restaurantEmail ? (
                 <div className="bg-white border border-neutral-200 rounded-lg p-6 text-center">
                   <UtensilsCrossed className="h-8 w-8 text-emerald-500 mx-auto mb-3" />
-                  <p className="text-[13px] font-medium text-neutral-950">Restaurant already connected</p>
-                  <p className="text-[12px] text-neutral-500 mt-1">Redirecting you to Zhimpu...</p>
+                  <p className="text-[13px] font-medium text-neutral-950">Restaurant connected to Zhimpu</p>
+                  <p className="text-[12px] text-neutral-500 mt-1">
+                    Manage your restaurant's menu, orders, and staff from the Zhimpu dashboard.
+                  </p>
+                  <button
+                    onClick={() =>
+                      window.open(
+                        `https://zhimpu.dcpl.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`,
+                        "_blank",
+                        "noopener,noreferrer"
+                      )
+                    }
+                    className="mt-4 inline-flex items-center gap-1.5 h-8 px-4 rounded-md bg-neutral-950 text-white text-[12px] font-medium hover:opacity-85 transition-opacity"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open Zhimpu Dashboard
+                  </button>
                 </div>
               ) : (
                 <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">

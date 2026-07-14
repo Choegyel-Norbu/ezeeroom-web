@@ -33,7 +33,6 @@ export const SUBSCRIPTION_PLANS = {
     annualPrice: 9990,
     currency: 'Nu.',
     duration: 1, // month
-    maxRooms: 10,
     maxStaff: 2,
     // Features shown on the Basic card. `included: false` renders as a muted, dashed item.
     features: [
@@ -42,7 +41,7 @@ export const SUBSCRIPTION_PLANS = {
       { label: 'Admin & time-based booking', included: true },
       { label: 'Passcode check-in & CID verification', included: true },
       { label: 'Up to 2 staff accounts', included: true },
-      { label: 'Up to 10 rooms', included: true },
+      { label: 'Unlimited rooms', included: true },
       { label: 'Hotel listing & profile', included: true },
       { label: 'Analytics & reports', included: false },
       { label: 'Leave management', included: false },

@@ -370,7 +370,7 @@ const SubscriptionPage = () => {
           <div className="flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-700 text-[11px] font-medium px-2 py-1 rounded">
               <Building2 className="h-3 w-3" />
-              {isPro ? 'Unlimited rooms' : 'Up to 10 rooms'}
+              Unlimited rooms
             </span>
             <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-700 text-[11px] font-medium px-2 py-1 rounded">
               <Users className="h-3 w-3" />

@@ -39,7 +39,6 @@ import { toast } from "sonner";
 import { useAuth } from "../authentication";
 import api from "../../shared/services/Api";
 import RoomDeletionDialog from "../../shared/components/RoomDeletionDialog";
-import ProUpgradeDialog from "../../shared/components/ProUpgradeDialog";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/tooltip";
 import { Checkbox } from "@/shared/components/checkbox";
@@ -114,10 +113,7 @@ const mealPlanLabels = {
   AP: "AP — American Plan (+ all meals)",
 };
 
-const ROOM_LIMIT = 10;
-
-const RoomManager = ({ hotelId, subscriptionPlan }) => {
-  const isLimitedPlan = subscriptionPlan === 'BASIC' || subscriptionPlan === 'TRIAL';
+const RoomManager = ({ hotelId }) => {
   const [showForm, setShowForm]               = useState(false);
   const [editingRoom, setEditingRoom]         = useState(null);
   const [roomAdded, setRoomAdded]             = useState(false);
@@ -127,7 +123,6 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [deletionDialogOpen, setDeletionDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete]       = useState(null);
-  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const formRef = useRef(null);
 
   const [roomForm, setRoomForm] = useState({
@@ -380,19 +375,17 @@ const RoomManager = ({ hotelId, subscriptionPlan }) => {
           <Bed className="h-[14px] w-[14px] text-neutral-500" />
           <h3 className="text-[13px] font-semibold text-neutral-950">All Rooms</h3>
           <span className="ml-1 inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500">
-            {rooms.length}{isLimitedPlan ? ` / ${ROOM_LIMIT}` : ""}
+            {rooms.length}
           </span>
         </div>
         <button
-          onClick={() => isLimitedPlan && rooms.length >= ROOM_LIMIT ? setUpgradeDialogOpen(true) : (setShowForm(true), setEditingRoom(null))}
+          onClick={() => (setShowForm(true), setEditingRoom(null))}
           className="flex items-center gap-1.5 h-8 px-3.5 rounded-md bg-neutral-950 text-white text-[12px] font-medium hover:opacity-85 transition-opacity"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Room
         </button>
       </div>
-
-      <ProUpgradeDialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen} />
 
       {/* Room Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>

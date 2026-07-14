@@ -774,6 +774,9 @@ const HotelDetailsPage = () => {
   const handlePageChange = useCallback((page) => {
     setHasNavigatedFromInitialPage(true);
     setRoomsState(prev => ({ ...prev, currentPage: page }));
+    // Bring the "Available Rooms" heading to the top of the viewport on pagination.
+    // The section's scroll-mt-24 offsets for the sticky navbar so the heading stays visible.
+    roomsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const handleShare = useCallback(async () => {
@@ -1422,13 +1425,20 @@ const HotelDetailsPage = () => {
                     Available Rooms
                   </h2>
                 </div>
-                {roomsState.loading && (
-                  <SimpleSpinner
-                    size={24}
-                    text="Loading rooms..."
-                    className="mb-2"
-                  />
-                )}
+                <div className="flex items-center gap-3">
+                  {roomsState.loading && (
+                    <SimpleSpinner
+                      size={24}
+                      text="Loading rooms..."
+                      className="mb-2"
+                    />
+                  )}
+                  {roomsState.paginationData?.page?.totalPages > 1 && (
+                    <div className="text-xs text-muted-foreground">
+                      Page {roomsState.currentPage + 1} of {roomsState.paginationData.page?.totalPages || 1}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-6 min-h-[400px]">
