@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { formatTimeTo12Hour } from '../utils/utils';
+import { syncAdditionalGuests, validateAdditionalGuests } from '../components/AdditionalGuestFields';
 
 // Round a currency amount to exactly 2 decimal places (nearest, HALF_UP) to match
 // the backend's PriceCalculationService. Never rounds up to a whole Ngultrum.
@@ -22,8 +23,9 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     destination: "",
     origin: "",
     isBhutanese: true,
+    additionalGuests: [],
   });
-  
+
   const [errors, setErrors] = useState({});
 
   // Helper: block morning of selected date only when previous day has no time-based bookings
@@ -355,7 +357,13 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     } else if (bookingDetails.guests > 6) {
       newErrors.guests = "Maximum 6 guests allowed";
     }
-    
+
+    // Validate additional guests' identity (occupants 2..guests)
+    const additionalGuestErrors = validateAdditionalGuests(bookingDetails.guests, bookingDetails.additionalGuests);
+    if (additionalGuestErrors) {
+      newErrors.additionalGuests = additionalGuestErrors;
+    }
+
     return newErrors;
   }, [bookingDetails, room?.maxGuests, hasTimeConflict, validateCID, validatePassportNumber, validateDestination, validateOrigin, validateBhutanesePhone, hotelCheckoutTime]);
 
@@ -441,8 +449,9 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     setBookingDetails((prev) => ({
       ...prev,
       guests: numGuests,
+      additionalGuests: syncAdditionalGuests(numGuests, prev.additionalGuests),
     }));
-    
+
     // Clear error for this field
     if (errors.guests) {
       setErrors((prev) => ({
@@ -483,6 +492,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
       destination: "",
       origin: "",
       isBhutanese: true,
+      additionalGuests: [],
     });
     setErrors({});
   }, []);

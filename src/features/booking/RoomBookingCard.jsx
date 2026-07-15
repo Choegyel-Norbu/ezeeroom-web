@@ -28,6 +28,10 @@ import { Switch } from "@/shared/components/switch";
 import { CheckCircle, AlertTriangle, UserCheck } from "lucide-react";
 import LoginModal from "../authentication/LoginModal";
 import { BookingSuccessModal, CustomDatePicker } from "../../shared/components";
+import AdditionalGuestFields, {
+  syncAdditionalGuests,
+  validateAdditionalGuests,
+} from "@/shared/components/AdditionalGuestFields";
 import TimeBasedBookingDialog from "./TimeBasedBookingDialog";
 import * as availability from "./bookingAvailability";
 import { toast } from "sonner"; // Using sonner for toasts
@@ -61,6 +65,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     origin: "",
     guests: 1,
     isBhutanese: true,
+    additionalGuests: [],
   });
   const [immediateBookingErrors, setImmediateBookingErrors] = useState({});
   const [bookingDetails, setBookingDetails] = useState({
@@ -75,6 +80,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     origin: "",
     isBhutanese: true,
     mealPlanType: "EP",
+    additionalGuests: [],
   });
   const [errors, setErrors] = useState({});
   const [isBookingLoading, setIsBookingLoading] = useState(false);
@@ -289,7 +295,8 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
       'cid',
       'destination',
       'origin',
-      'guests'
+      'guests',
+      'additionalGuests'
     ];
 
     // Find the first error field based on priority
@@ -483,7 +490,13 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     } else if (bookingDetails.guests > 6) {
       newErrors.guests = "Maximum 6 guests allowed";
     }
-    
+
+    // Validate additional guests' identity (occupants 2..guests)
+    const additionalGuestErrors = validateAdditionalGuests(bookingDetails.guests, bookingDetails.additionalGuests);
+    if (additionalGuestErrors) {
+      newErrors.additionalGuests = additionalGuestErrors;
+    }
+
     // Validation errors
     return newErrors;
   };
@@ -681,7 +694,8 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
       'cid',
       'destination',
       'origin',
-      'guests'
+      'guests',
+      'additionalGuests'
     ];
 
     // Find the first error field based on priority
@@ -805,7 +819,16 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     } else if (immediateBookingDetails.guests > 6) {
       newErrors.guests = "Maximum 6 guests allowed";
     }
-    
+
+    // Validate additional guests' identity (occupants 2..guests)
+    const additionalGuestErrors = validateAdditionalGuests(
+      immediateBookingDetails.guests,
+      immediateBookingDetails.additionalGuests
+    );
+    if (additionalGuestErrors) {
+      newErrors.additionalGuests = additionalGuestErrors;
+    }
+
     return newErrors;
   };
 
@@ -883,6 +906,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
           destination: "",
           origin: "",
           isBhutanese: true,
+          additionalGuests: [],
         });
         setErrors({});
 
@@ -939,6 +963,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
         passportNumber: immediateBookingDetails.passportNumber,
         destination: immediateBookingDetails.destination,
         origin: immediateBookingDetails.origin,
+        additionalGuests: immediateBookingDetails.additionalGuests,
         adminBooking: false,
         initiatePayment: true,
         // Hourly booking fields (immediate booking is always regular)
@@ -984,9 +1009,10 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
           origin: "",
           guests: 1,
           isBhutanese: true,
+          additionalGuests: [],
         });
         setImmediateBookingErrors({});
-        
+
         // Show toast notification
         toast.success("Booking Successful!", {
           description: "Your room has been booked for tonight! QR code generated!",
@@ -1583,6 +1609,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                       setBookingDetails((prev) => ({
                         ...prev,
                         guests: numGuests,
+                        additionalGuests: syncAdditionalGuests(numGuests, prev.additionalGuests),
                       }));
                       // Clear error for this field
                       if (errors.guests) {
@@ -1616,6 +1643,26 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     </p>
                   )}
                 </div>
+
+                <AdditionalGuestFields
+                  guests={bookingDetails.guests}
+                  additionalGuests={bookingDetails.additionalGuests}
+                  errors={errors.additionalGuests}
+                  onGuestChange={(index, updatedGuest) => {
+                    setBookingDetails((prev) => {
+                      const next = [...prev.additionalGuests];
+                      next[index] = updatedGuest;
+                      return { ...prev, additionalGuests: next };
+                    });
+                    if (errors.additionalGuests?.[index]) {
+                      setErrors((prev) => {
+                        const nextGuestErrors = [...prev.additionalGuests];
+                        nextGuestErrors[index] = {};
+                        return { ...prev, additionalGuests: nextGuestErrors };
+                      });
+                    }
+                  }}
+                />
 
                 {room.mealPlans?.length > 0 && (
                   <div className="grid gap-2" data-field="mealPlanType">
@@ -1831,6 +1878,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
               origin: "",
               guests: 1,
               isBhutanese: true,
+              additionalGuests: [],
             });
             setImmediateBookingErrors({});
           }
@@ -2044,6 +2092,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     setImmediateBookingDetails((prev) => ({
                       ...prev,
                       guests: numGuests,
+                      additionalGuests: syncAdditionalGuests(numGuests, prev.additionalGuests),
                     }));
                     // Clear error for this field
                     if (immediateBookingErrors.guests) {
@@ -2077,6 +2126,26 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                   </p>
                 )}
               </div>
+
+              <AdditionalGuestFields
+                guests={immediateBookingDetails.guests}
+                additionalGuests={immediateBookingDetails.additionalGuests}
+                errors={immediateBookingErrors.additionalGuests}
+                onGuestChange={(index, updatedGuest) => {
+                  setImmediateBookingDetails((prev) => {
+                    const next = [...prev.additionalGuests];
+                    next[index] = updatedGuest;
+                    return { ...prev, additionalGuests: next };
+                  });
+                  if (immediateBookingErrors.additionalGuests?.[index]) {
+                    setImmediateBookingErrors((prev) => {
+                      const nextGuestErrors = [...prev.additionalGuests];
+                      nextGuestErrors[index] = {};
+                      return { ...prev, additionalGuests: nextGuestErrors };
+                    });
+                  }
+                }}
+              />
 
               {/* Booking Summary */}
               <div className="bg-muted/50 rounded-lg p-4 space-y-3">

@@ -788,6 +788,27 @@ const BookingTable = ({ hotelId, refreshSignal }) => {
                 </div>
               </div>
 
+              {/* Additional Guests (occupants beyond the primary guest) */}
+              {Array.isArray(selectedBooking.additionalGuests) && selectedBooking.additionalGuests.length > 0 && (
+                <div className="md:col-span-2">
+                  <p className="text-[11px] font-semibold tracking-widest uppercase text-neutral-400 mb-4">Additional Guests</p>
+                  <div className="space-y-3">
+                    {selectedBooking.additionalGuests.map((guest, index) => (
+                      <div key={guest.id ?? index} className="flex items-center justify-between gap-4">
+                        <span className="text-[13px] font-medium text-neutral-950">
+                          {guest.name || `Guest ${index + 2}`}
+                        </span>
+                        <span className="text-[12px] text-neutral-500 text-right">
+                          {guest.cid || guest.passportNumber
+                            ? `${guest.passportNumber ? 'Passport' : 'CID'}: ${guest.cid || guest.passportNumber}`
+                            : 'No ID provided'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Booking Details */}
               <div className="md:col-span-2">
                 <p className="text-[11px] font-semibold tracking-widest uppercase text-neutral-400 mb-4">Booking Details</p>

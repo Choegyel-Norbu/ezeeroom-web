@@ -184,6 +184,8 @@ const HotelAdminDashboard = () => {
   const [hasRestaurantEnabled, setHasRestaurantEnabled] = useState(false);
   const [walkInServiceChargeEnabled, setWalkInServiceChargeEnabled] = useState(false);
   const [walkInServiceChargePercent, setWalkInServiceChargePercent] = useState("");
+  // false = charge added on top of room price; true = charge already included in room price
+  const [walkInServiceChargeInclusive, setWalkInServiceChargeInclusive] = useState(false);
   const [savingNotifyNewBooking, setSavingNotifyNewBooking] = useState(false);
   const [savingNotifyCancellation, setSavingNotifyCancellation] = useState(false);
   const [savingGst, setSavingGst] = useState(false);
@@ -668,6 +670,7 @@ const HotelAdminDashboard = () => {
       setWalkInServiceChargePercent(
         hotel.walkInServiceChargePercent != null ? String(hotel.walkInServiceChargePercent) : ""
       );
+      setWalkInServiceChargeInclusive(hotel.walkInServiceChargeInclusive ?? false);
     }
   }, [hotel?.id]);
 
@@ -683,6 +686,9 @@ const HotelAdminDashboard = () => {
       walkInServiceChargePercent: walkInCharge
         ? parseFloat(overrides.walkInServiceChargePercent ?? walkInServiceChargePercent) || 0
         : null,
+      walkInServiceChargeInclusive: walkInCharge
+        ? (overrides.walkInServiceChargeInclusive ?? walkInServiceChargeInclusive)
+        : false,
     };
     const res = await api.put(`/hotels/${hotel.id}`, payload);
     updateHotel(res.data);
@@ -773,6 +779,7 @@ const HotelAdminDashboard = () => {
       setWalkInServiceChargePercent(
         updated.walkInServiceChargePercent != null ? String(updated.walkInServiceChargePercent) : ""
       );
+      setWalkInServiceChargeInclusive(updated.walkInServiceChargeInclusive ?? false);
       toast.success(checked ? "Hotel service charge enabled." : "Hotel service charge disabled.");
     } catch (err) {
       console.error("Walk-in service charge update error:", err);
@@ -797,6 +804,26 @@ const HotelAdminDashboard = () => {
     } catch (err) {
       console.error("Walk-in service charge update error:", err);
       toast.error("Failed to update hotel service charge.");
+    } finally {
+      setSavingWalkInServiceCharge(false);
+    }
+  };
+
+  const handleChangeWalkInServiceChargeInclusive = async (inclusive) => {
+    const previous = walkInServiceChargeInclusive;
+    setWalkInServiceChargeInclusive(inclusive);
+    setSavingWalkInServiceCharge(true);
+    try {
+      await saveGeneralHotelSettings({ walkInServiceCharge: true, walkInServiceChargeInclusive: inclusive });
+      toast.success(
+        inclusive
+          ? "Service charge is now treated as included in the room price."
+          : "Service charge is now added on top of the room price."
+      );
+    } catch (err) {
+      console.error("Walk-in service charge mode update error:", err);
+      setWalkInServiceChargeInclusive(previous);
+      toast.error("Failed to update service charge mode.");
     } finally {
       setSavingWalkInServiceCharge(false);
     }
@@ -2303,6 +2330,43 @@ const HotelAdminDashboard = () => {
                         </p>
                       </div>
                     )}
+                    {walkInServiceChargeEnabled && (
+                      <div className="px-5 py-4 border-t border-neutral-100">
+                        <Label className="text-[12px] font-medium text-neutral-700 mb-2 block">How is the service charge applied?</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleChangeWalkInServiceChargeInclusive(false)}
+                            disabled={savingWalkInServiceCharge}
+                            className={`text-left rounded-md border p-3 transition-colors disabled:opacity-40 ${
+                              !walkInServiceChargeInclusive
+                                ? "border-neutral-950 bg-neutral-50"
+                                : "border-neutral-200 hover:border-neutral-300"
+                            }`}
+                          >
+                            <p className="text-[13px] font-medium text-neutral-950">Added on top</p>
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                              Charge is added to the room price. The guest pays room price + service charge.
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleChangeWalkInServiceChargeInclusive(true)}
+                            disabled={savingWalkInServiceCharge}
+                            className={`text-left rounded-md border p-3 transition-colors disabled:opacity-40 ${
+                              walkInServiceChargeInclusive
+                                ? "border-neutral-950 bg-neutral-50"
+                                : "border-neutral-200 hover:border-neutral-300"
+                            }`}
+                          >
+                            <p className="text-[13px] font-medium text-neutral-950">Included in room price</p>
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                              Charge is already inside the room price. It's only broken out on the receipt; the total is unchanged.
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Booking Options Section */}
@@ -2652,6 +2716,7 @@ const HotelAdminDashboard = () => {
                   hotelGst={hotel?.gst ?? false}
                   hotelWalkInServiceChargeEnabled={hotel?.walkInServiceCharge ?? false}
                   hotelWalkInServiceChargePercent={hotel?.walkInServiceChargePercent ?? 0}
+                  hotelWalkInServiceChargeInclusive={hotel?.walkInServiceChargeInclusive ?? false}
                   onBookingSuccess={handleBookingSuccess}
                   isDisabled={isSubscriptionExpired()}
                 />

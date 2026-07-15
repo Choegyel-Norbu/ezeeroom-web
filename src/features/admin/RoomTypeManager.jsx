@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Tag } from "lucide-react";
+import { Plus, Tag, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../shared/services/Api";
 import {
@@ -26,6 +26,8 @@ const RoomTypeManager = ({ hotelId }) => {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draggedId, setDraggedId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   useEffect(() => {
     if (!hotelId) return;
@@ -74,6 +76,45 @@ const RoomTypeManager = ({ hotelId }) => {
     }
   };
 
+  const persistOrder = async (previousOrder, newOrder) => {
+    try {
+      const updates = newOrder
+        .map((type, index) => ({ type, index }))
+        .filter(({ type, index }) => type.sortOrder !== index);
+
+      await Promise.all(
+        updates.map(({ type, index }) =>
+          api.put(`/hotels/${hotelId}/room-types/${type.id}`, { sortOrder: index })
+        )
+      );
+
+      setRoomTypes(newOrder.map((type, index) => ({ ...type, sortOrder: index })));
+    } catch {
+      toast.error("Failed to save new order", { duration: 6000 });
+      setRoomTypes(previousOrder);
+    }
+  };
+
+  const handleDrop = (targetId) => {
+    if (draggedId === null || draggedId === targetId) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    const previousOrder = roomTypes;
+    const newOrder = [...roomTypes];
+    const draggedIndex = newOrder.findIndex((t) => t.id === draggedId);
+    const targetIndex = newOrder.findIndex((t) => t.id === targetId);
+    const [draggedItem] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedItem);
+
+    setRoomTypes(newOrder);
+    setDraggedId(null);
+    setDragOverId(null);
+    persistOrder(previousOrder, newOrder);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -92,6 +133,9 @@ const RoomTypeManager = ({ hotelId }) => {
           <span className="ml-1 inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500">
             {roomTypes.length}
           </span>
+          {roomTypes.length > 1 && (
+            <span className="text-[11px] text-neutral-400">Drag rows to reorder</span>
+          )}
         </div>
         <button
           onClick={openAddForm}
@@ -185,9 +229,34 @@ const RoomTypeManager = ({ hotelId }) => {
               </TableRow>
             ) : (
               roomTypes.map((type) => (
-                <TableRow key={type.id} className="border-b border-neutral-100 hover:bg-neutral-50/60 transition-colors">
+                <TableRow
+                  key={type.id}
+                  draggable
+                  onDragStart={() => setDraggedId(type.id)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverId(type.id);
+                  }}
+                  onDragLeave={() =>
+                    setDragOverId((prev) => (prev === type.id ? null : prev))
+                  }
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDrop(type.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedId(null);
+                    setDragOverId(null);
+                  }}
+                  className={`border-b border-neutral-100 hover:bg-neutral-50/60 transition-colors cursor-grab active:cursor-grabbing ${
+                    draggedId === type.id ? "opacity-40" : ""
+                  } ${dragOverId === type.id && draggedId !== type.id ? "bg-neutral-100" : ""}`}
+                >
                   <TableCell className="px-5 py-3">
-                    <span className="text-[13px] font-medium text-neutral-950">{type.name}</span>
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-3.5 w-3.5 text-neutral-300 flex-shrink-0" />
+                      <span className="text-[13px] font-medium text-neutral-950">{type.name}</span>
+                    </div>
                   </TableCell>
                   <TableCell className="px-4 py-3">
                     <span className="text-[13px] text-neutral-700 tabular-nums">{type.sortOrder}</span>

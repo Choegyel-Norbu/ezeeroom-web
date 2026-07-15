@@ -72,6 +72,10 @@ const buildLineItems = (receiptData) => {
     const rate = receiptData.walkInServiceChargeRate;
     items.push({
       label: `Service Charge${rate ? ` (${Math.round(parseFloat(rate) * 100)}%)` : ''}`,
+      // Inclusive: the charge is part of the room price (Room Charges is shown
+      // net of it), so flag it as included. Additive: no note - the charge is
+      // plainly added on top and the total makes that clear.
+      note: receiptData.walkInServiceChargeInclusive ? 'incl. in room price' : undefined,
       amount: walkInServiceChargeAmount, currency,
     });
   }
@@ -118,7 +122,7 @@ const buildReceiptHtml = (booking, receiptData) => {
   const lineItems = buildLineItems(receiptData);
   const ledgerRows = lineItems.map((item) => `
     <tr>
-      <td>${escapeHtml(item.label)}</td>
+      <td>${escapeHtml(item.label)}${item.note ? ` <span class="row-note">(${escapeHtml(item.note)})</span>` : ''}</td>
       <td class="num">${formatCurrency(item.amount, item.currency)}</td>
     </tr>
   `).join('');
@@ -134,11 +138,12 @@ const buildReceiptHtml = (booking, receiptData) => {
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-    color:#221f1a;
+    color:#000;
     background:#fffdf7;
     font-size:13px;
+    font-weight:700;
   }
-  .ink{ color:#221f1a; }
+  .ink{ color:#000; }
   .head{
     display:flex; align-items:center; justify-content:space-between;
     gap:20px; padding-bottom:14px; border-bottom:2.5px solid #7c2e2b;
@@ -150,18 +155,18 @@ const buildReceiptHtml = (booking, receiptData) => {
     font-family:Georgia,"Times New Roman",serif; font-size:17px; color:#7c2e2b; flex:none;
   }
   .brand h1{ margin:0; font-family:Georgia,"Times New Roman",serif; font-size:20px; letter-spacing:.01em; }
-  .brand p{ margin:2px 0 0; font-size:11px; color:#7d7566; letter-spacing:.02em; }
-  .head-meta{ text-align:right; font-size:11.5px; color:#7d7566; line-height:1.6; }
-  .head-meta b{ color:#221f1a; font-weight:600; }
+  .brand p{ margin:2px 0 0; font-size:11px; color:#000; letter-spacing:.02em; }
+  .head-meta{ text-align:right; font-size:11.5px; color:#000; line-height:1.6; }
+  .head-meta b{ color:#000; font-weight:700; }
   .doc-title{
     text-align:center; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
-    color:#7d7566; padding:12px 0 4px;
+    color:#000; padding:12px 0 4px;
   }
   table.block{ width:100%; border-collapse:collapse; font-size:12.5px; margin:0 0 14px; }
   table.block td{ border:1px solid #999083; padding:7px 10px; vertical-align:top; }
-  .lbl{ display:block; font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:#7d7566; margin-bottom:3px; }
-  .val{ font-weight:600; }
-  .val.mono{ font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; font-weight:600; }
+  .lbl{ display:block; font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:#000; margin-bottom:3px; }
+  .val{ font-weight:700; }
+  .val.mono{ font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; font-weight:700; }
   table.ledger{ width:100%; border-collapse:collapse; font-size:12.5px; margin:4px 0 0; }
   table.ledger th{
     background:#f4e9e2; color:#7c2e2b; font-size:10px; letter-spacing:.05em; text-transform:uppercase;
@@ -174,28 +179,29 @@ const buildReceiptHtml = (booking, receiptData) => {
   table.ledger tr.grand td{
     background:#f4e9e2; font-weight:700; font-size:13.5px; border-top:1.5px solid #7c2e2b; color:#7c2e2b;
   }
+  .row-note{ font-size:10px; font-weight:400; color:#000; }
   .status-row{ display:flex; align-items:center; justify-content:space-between; margin-top:16px; gap:14px; }
   .pill{
     display:inline-block; padding:7px 20px; border-radius:3px; font-weight:700; font-size:12.5px;
     letter-spacing:.04em; color:#fff;
     background:${isPaid ? '#3f7a52' : '#7c2e2b'};
   }
-  .paid-amount{ text-align:right; font-size:12.5px; color:#7d7566; }
+  .paid-amount{ text-align:right; font-size:12.5px; color:#000; }
   .paid-amount b{
-    display:block; font-size:15px; color:#221f1a;
+    display:block; font-size:15px; color:#000;
     font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums;
   }
   .foot{
-    display:grid; grid-template-columns:1.3fr 1fr; gap:20px; margin-top:26px; font-size:12px; color:#7d7566;
+    display:grid; grid-template-columns:1.3fr 1fr; gap:20px; margin-top:26px; font-size:12px; color:#000;
   }
-  .foot b{ color:#221f1a; }
+  .foot b{ color:#000; }
   .sign-box{ display:flex; align-items:flex-end; justify-content:flex-end; }
-  .sign-line{ text-align:center; font-size:11px; color:#7d7566; border-top:1px solid #a89c81; padding-top:6px; width:170px; }
+  .sign-line{ text-align:center; font-size:11px; color:#000; border-top:1px solid #a89c81; padding-top:6px; width:170px; }
   .sign-off{
     display:flex; justify-content:space-between; align-items:flex-end; margin-top:30px; font-size:12.5px;
   }
-  .sign-off .for-line{ color:#7d7566; }
-  .sign-off .for-line b{ color:#221f1a; font-family:Georgia,"Times New Roman",serif; font-style:italic; }
+  .sign-off .for-line{ color:#000; }
+  .sign-off .for-line b{ color:#000; font-family:Georgia,"Times New Roman",serif; font-style:italic; }
 </style>
 </head>
 <body>
@@ -222,7 +228,7 @@ const buildReceiptHtml = (booking, receiptData) => {
       <td style="width:25%"><span class="lbl">Guest Name</span><span class="val">${escapeHtml(guestName)}</span></td>
       <td style="width:25%"><span class="lbl">Room No</span><span class="val">${escapeHtml(roomNumber)}</span></td>
       <td style="width:25%"><span class="lbl">Guests</span><span class="val">${escapeHtml(guests)}</span></td>
-      <td style="width:25%"><span class="lbl">Payment Method</span><span class="val">${paymentMethodLabel}${journalLine ? ` <span style="font-weight:400;color:#7d7566">(${journalLine})</span>` : ''}</span></td>
+      <td style="width:25%"><span class="lbl">Payment Method</span><span class="val">${paymentMethodLabel}${journalLine ? ` <span style="color:#000">(${journalLine})</span>` : ''}</span></td>
     </tr>
     <tr>
       <td><span class="lbl">Phone</span><span class="val">${escapeHtml(guestPhone || 'N/A')}</span></td>

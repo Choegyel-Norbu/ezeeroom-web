@@ -229,7 +229,7 @@ export const generateBookingReceipt = async (booking, receiptData = {}) => {
         // so convert to a whole percentage for display (Math.round avoids float artifacts
         // like 0.03 * 100 = 3.0000000000000004).
         ...(walkInServiceChargeAmount > 0
-          ? [{ label: `Service Charge${receiptData.walkInServiceChargeRate ? ` (${Math.round(parseFloat(receiptData.walkInServiceChargeRate) * 100)}%)` : ''}`, amount: walkInServiceChargeAmount }]
+          ? [{ label: `Service Charge${receiptData.walkInServiceChargeRate ? ` (${Math.round(parseFloat(receiptData.walkInServiceChargeRate) * 100)}%)` : ''}${receiptData.walkInServiceChargeInclusive ? ' (incl. in room price)' : ''}`, amount: walkInServiceChargeAmount }]
           : []),
         ...(gstAmount > 0
           ? [{ label: `GST${receiptData.gstRate ? ` (${Math.round(parseFloat(receiptData.gstRate) * 100)}%)` : ''}`, amount: gstAmount }]

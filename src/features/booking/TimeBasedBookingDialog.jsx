@@ -28,6 +28,7 @@ import { Separator } from "@/shared/components/separator";
 import { Switch } from "@/shared/components/switch";
 import { AlertTriangle } from "lucide-react";
 import { BookingSuccessModal, CustomDatePicker } from "../../shared/components";
+import AdditionalGuestFields from "@/shared/components/AdditionalGuestFields";
 import { toast } from "sonner";
 
 export default function TimeBasedBookingDialog({
@@ -51,6 +52,7 @@ export default function TimeBasedBookingDialog({
   const {
     bookingDetails,
     errors,
+    setBookingDetails,
     setErrors,
     handleInputChange,
     handleDateSelect,
@@ -260,6 +262,7 @@ export default function TimeBasedBookingDialog({
         destination: bookingDetails.destination,
         origin: bookingDetails.origin,
         guestName: bookingDetails.guestName || "Guest",
+        additionalGuests: bookingDetails.additionalGuests,
         timeBased: true,
         initiatePayment: true,
         adminBooking: false
@@ -826,6 +829,26 @@ export default function TimeBasedBookingDialog({
                     </p>
                   )}
                 </div>
+
+                <AdditionalGuestFields
+                  guests={bookingDetails.guests}
+                  additionalGuests={bookingDetails.additionalGuests}
+                  errors={errors.additionalGuests}
+                  onGuestChange={(index, updatedGuest) => {
+                    setBookingDetails((prev) => {
+                      const next = [...prev.additionalGuests];
+                      next[index] = updatedGuest;
+                      return { ...prev, additionalGuests: next };
+                    });
+                    if (errors.additionalGuests?.[index]) {
+                      setErrors((prev) => {
+                        const nextGuestErrors = [...prev.additionalGuests];
+                        nextGuestErrors[index] = {};
+                        return { ...prev, additionalGuests: nextGuestErrors };
+                      });
+                    }
+                  }}
+                />
               </div>
 
               <Separator className="my-2" />

@@ -26,6 +26,10 @@ import { Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { CustomDatePicker } from "../../shared/components";
 import { useTimeBasedBooking } from "../../shared/hooks/useTimeBasedBooking";
+import AdditionalGuestFields, {
+  syncAdditionalGuests,
+  validateAdditionalGuests,
+} from "@/shared/components/AdditionalGuestFields";
 
 // Round a currency amount to exactly 2 decimal places (nearest, HALF_UP) to match
 // the backend's PriceCalculationService. Never rounds up to a whole Ngultrum.
@@ -36,6 +40,7 @@ export default function AdminBookingForm({
   hotelGst = false,
   hotelWalkInServiceChargeEnabled = false,
   hotelWalkInServiceChargePercent = 0,
+  hotelWalkInServiceChargeInclusive = false,
   onBookingSuccess,
   isDisabled = false,
 }) {
@@ -62,6 +67,7 @@ export default function AdminBookingForm({
     destination: "",
     origin: "",
     isBhutanese: true,
+    additionalGuests: [],
   });
   const [errors, setErrors] = useState({});
   const [discountAmount, setDiscountAmount] = useState("");
@@ -76,6 +82,7 @@ export default function AdminBookingForm({
   const {
     bookingDetails: timeBasedDetails,
     errors: timeBasedErrors,
+    setBookingDetails: setTimeBasedDetails,
     setErrors: setTimeBasedErrors,
     handleInputChange: handleTimeBasedInputChange,
     handleDateSelect: handleTimeBasedDateSelect,
@@ -514,41 +521,56 @@ export default function AdminBookingForm({
 
   // Walk-in (admin) bookings are exempt from the platform's service charge;
   // the hotel's own walk-in service charge applies instead, unless waived.
-  const calculateWalkInServiceCharge = () => {
+  // Charge is a flat percentage of the room price in BOTH modes
+  // (mirrors PriceCalculationServiceImpl.applyWalkInPricing):
+  //   charge = roomPrice × rate  (e.g. 10% of 800 = 80)
+  //   ADDITIVE  - the charge is added on top of the room price.
+  //   INCLUSIVE - the charge is already inside the room price (net = price − charge),
+  //               so it's NOT added again to the total.
+  const extractOrAddCharge = (roomPrice) => {
     if (!hotelWalkInServiceChargeEnabled || waiveWalkInServiceCharge) return 0;
-    return round2(calculateTotalPrice() * (hotelWalkInServiceChargePercent / 100));
+    const rate = hotelWalkInServiceChargePercent / 100;
+    return round2(roomPrice * rate);
   };
+
+  const calculateWalkInServiceCharge = () => extractOrAddCharge(calculateTotalPrice());
+
+  // In inclusive mode the charge is already part of the room price, so it must
+  // NOT be added again when building the payable total.
+  const walkInChargeAddedToTotal = (charge) =>
+    hotelWalkInServiceChargeInclusive ? 0 : charge;
 
   const calculateAppliedDiscount = () => {
     const requested = parseFloat(discountAmount) || 0;
     if (requested <= 0) return 0;
-    const preDiscountTotal = calculateTotalPrice() + calculateGst() + calculateWalkInServiceCharge();
+    const preDiscountTotal = calculateTotalPrice() + calculateGst()
+      + walkInChargeAddedToTotal(calculateWalkInServiceCharge());
     return round2(Math.min(requested, preDiscountTotal));
   };
 
   const calculateTxnTotalPrice = () => {
     return round2(
-      calculateTotalPrice() + calculateGst() + calculateWalkInServiceCharge() - calculateAppliedDiscount()
+      calculateTotalPrice() + calculateGst()
+        + walkInChargeAddedToTotal(calculateWalkInServiceCharge()) - calculateAppliedDiscount()
     );
   };
 
   // Same overrides for time-based (hourly) bookings, using the hook's base price/GST.
-  const calculateTimeBasedWalkInServiceCharge = () => {
-    if (!hotelWalkInServiceChargeEnabled || waiveWalkInServiceCharge) return 0;
-    return round2(calculateTimeBasedBasePrice() * (hotelWalkInServiceChargePercent / 100));
-  };
+  const calculateTimeBasedWalkInServiceCharge = () => extractOrAddCharge(calculateTimeBasedBasePrice());
 
   const calculateTimeBasedAppliedDiscount = () => {
     const requested = parseFloat(discountAmount) || 0;
     if (requested <= 0) return 0;
-    const preDiscountTotal = calculateTimeBasedBasePrice() + calculateTimeBasedRoomGst() + calculateTimeBasedWalkInServiceCharge();
+    const preDiscountTotal = calculateTimeBasedBasePrice() + calculateTimeBasedRoomGst()
+      + walkInChargeAddedToTotal(calculateTimeBasedWalkInServiceCharge());
     return round2(Math.min(requested, preDiscountTotal));
   };
 
   const calculateTimeBasedTxnTotalPriceWithWalkIn = () => {
     return round2(
       calculateTimeBasedBasePrice() + calculateTimeBasedRoomGst()
-        + calculateTimeBasedWalkInServiceCharge() - calculateTimeBasedAppliedDiscount()
+        + walkInChargeAddedToTotal(calculateTimeBasedWalkInServiceCharge())
+        - calculateTimeBasedAppliedDiscount()
     );
   };
 
@@ -754,7 +776,13 @@ export default function AdminBookingForm({
 
     const phoneError = validateBhutanesePhone(bookingDetails.phone);
     if (phoneError) newErrors.phone = phoneError;
-    
+
+    // Validate additional guests' identity (occupants 2..guests)
+    const additionalGuestErrors = validateAdditionalGuests(bookingDetails.guests, bookingDetails.additionalGuests);
+    if (additionalGuestErrors) {
+      newErrors.additionalGuests = additionalGuestErrors;
+    }
+
     return newErrors;
   };
 
@@ -1003,6 +1031,7 @@ export default function AdminBookingForm({
             destination: "",
             origin: "",
             isBhutanese: true,
+            additionalGuests: [],
           });
         }
         setErrors({});
@@ -1540,7 +1569,12 @@ export default function AdminBookingForm({
                       if (isTimeBasedBooking) {
                         handleTimeBasedGuestsChange(value);
                       } else {
-                        setBookingDetails(prev => ({ ...prev, guests: parseInt(value) }));
+                        const numGuests = parseInt(value);
+                        setBookingDetails(prev => ({
+                          ...prev,
+                          guests: numGuests,
+                          additionalGuests: syncAdditionalGuests(numGuests, prev.additionalGuests),
+                        }));
                       }
                     }}
                   >
@@ -1569,6 +1603,32 @@ export default function AdminBookingForm({
                     </p>
                   )}
                 </div>
+
+                <AdditionalGuestFields
+                  guests={isTimeBasedBooking ? timeBasedDetails.guests : bookingDetails.guests}
+                  additionalGuests={
+                    isTimeBasedBooking ? timeBasedDetails.additionalGuests : bookingDetails.additionalGuests
+                  }
+                  errors={isTimeBasedBooking ? timeBasedErrors.additionalGuests : errors.additionalGuests}
+                  onGuestChange={(index, updatedGuest) => {
+                    const setDetails = isTimeBasedBooking ? setTimeBasedDetails : setBookingDetails;
+                    const setFormErrors = isTimeBasedBooking ? setTimeBasedErrors : setErrors;
+                    const currentErrors = isTimeBasedBooking ? timeBasedErrors : errors;
+
+                    setDetails((prev) => {
+                      const next = [...prev.additionalGuests];
+                      next[index] = updatedGuest;
+                      return { ...prev, additionalGuests: next };
+                    });
+                    if (currentErrors.additionalGuests?.[index]) {
+                      setFormErrors((prev) => {
+                        const nextGuestErrors = [...prev.additionalGuests];
+                        nextGuestErrors[index] = {};
+                        return { ...prev, additionalGuests: nextGuestErrors };
+                      });
+                    }
+                  }}
+                />
               </div>
 
               <Separator className="my-2" />
@@ -1688,7 +1748,12 @@ export default function AdminBookingForm({
                       )}
                       {calculateTimeBasedWalkInServiceCharge() > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Service Charge ({hotelWalkInServiceChargePercent}%)</span>
+                          <span className="text-muted-foreground">
+                            Service Charge ({hotelWalkInServiceChargePercent}%)
+                            {hotelWalkInServiceChargeInclusive && (
+                              <span className="text-xs"> (incl. in room price)</span>
+                            )}
+                          </span>
                           <span className="font-medium">
                             Nu {calculateTimeBasedWalkInServiceCharge().toFixed(2)}
                           </span>
@@ -1765,7 +1830,12 @@ export default function AdminBookingForm({
                       )}
                       {days > 0 && walkInServiceChargeAmount > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Service Charge ({hotelWalkInServiceChargePercent}%)</span>
+                          <span className="text-muted-foreground">
+                            Service Charge ({hotelWalkInServiceChargePercent}%)
+                            {hotelWalkInServiceChargeInclusive && (
+                              <span className="text-xs"> (incl. in room price)</span>
+                            )}
+                          </span>
                           <span className="font-medium">Nu {walkInServiceChargeAmount.toFixed(2)}</span>
                         </div>
                       )}
