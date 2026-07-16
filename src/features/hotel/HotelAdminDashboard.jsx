@@ -182,6 +182,11 @@ const HotelAdminDashboard = () => {
   const [gstEnabled, setGstEnabled] = useState(false);
   const [hasTimeBasedEnabled, setHasTimeBasedEnabled] = useState(false);
   const [hasRestaurantEnabled, setHasRestaurantEnabled] = useState(false);
+  // Whether the one-time Nu 5,000 restaurant activation fee has ever been paid.
+  // Drives whether toggling the restaurant on starts a payment or just saves.
+  const [restaurantActivationPaid, setRestaurantActivationPaid] = useState(false);
+  // Confirmation dialog shown before starting the restaurant activation payment.
+  const [showRestaurantPayDialog, setShowRestaurantPayDialog] = useState(false);
   const [walkInServiceChargeEnabled, setWalkInServiceChargeEnabled] = useState(false);
   const [walkInServiceChargePercent, setWalkInServiceChargePercent] = useState("");
   // false = charge added on top of room price; true = charge already included in room price
@@ -666,6 +671,7 @@ const HotelAdminDashboard = () => {
       setGstEnabled(hotel.gst ?? false);
       setHasTimeBasedEnabled(hotel.hasTimeBased ?? false);
       setHasRestaurantEnabled(hotel.hasRestaurant ?? false);
+      setRestaurantActivationPaid(hotel.restaurantActivationPaid ?? false);
       setWalkInServiceChargeEnabled(hotel.walkInServiceCharge ?? false);
       setWalkInServiceChargePercent(
         hotel.walkInServiceChargePercent != null ? String(hotel.walkInServiceChargePercent) : ""
@@ -756,6 +762,16 @@ const HotelAdminDashboard = () => {
   };
 
   const handleToggleHasRestaurant = async (checked) => {
+    // Turning the restaurant ON for the first time requires the one-time
+    // Nu 5,000 activation fee. Confirm via a dialog before starting the
+    // BFS payment; the toggle stays off until payment succeeds (the
+    // server-side callback flips has_restaurant on).
+    if (checked && !restaurantActivationPaid) {
+      setShowRestaurantPayDialog(true);
+      return;
+    }
+
+    // Already paid (re-enabling) or turning off: normal setting update.
     setHasRestaurantEnabled(checked);
     setSavingHasRestaurant(true);
     try {
@@ -766,6 +782,36 @@ const HotelAdminDashboard = () => {
       setHasRestaurantEnabled(!checked);
       toast.error("Failed to update restaurant setting.");
     } finally {
+      setSavingHasRestaurant(false);
+    }
+  };
+
+  // Confirmed from the dialog: create the activation payment and hand off to
+  // the shared BFS payment page.
+  const proceedToRestaurantPayment = async () => {
+    setSavingHasRestaurant(true);
+    try {
+      const res = await api.post(`/payment/restaurant/initiate`, null, {
+        params: { hotelId: hotel.id, baseUrl: window.location.origin },
+      });
+      const data = res.data;
+      if (data?.success && data.payment?.orderNumber) {
+        setShowRestaurantPayDialog(false);
+        navigate("/payment", {
+          state: {
+            orderNumber: data.payment.orderNumber,
+            amount: data.payment.amount,
+            returnPath: "/hotelAdmin",
+          },
+        });
+      } else {
+        throw new Error(data?.message || "Failed to start activation payment");
+      }
+    } catch (err) {
+      console.error("Restaurant activation payment error:", err);
+      toast.error(
+        err.response?.data?.message || "Failed to start restaurant activation payment."
+      );
       setSavingHasRestaurant(false);
     }
   };
@@ -2400,7 +2446,9 @@ const HotelAdminDashboard = () => {
                         <p className="text-[12px] text-neutral-500 mt-0.5">
                           {hotel?.restaurantEmail
                             ? "Connected to Zhimpu. Contact support to disconnect."
-                            : "Turn this on to set up a restaurant for this hotel from the Restaurant menu."}
+                            : restaurantActivationPaid
+                              ? "Turn this on to set up a restaurant for this hotel from the Restaurant menu."
+                              : "Requires a one-time Nu 5,000 activation fee. Turning this on will start the payment."}
                         </p>
                       </div>
                       <Switch
@@ -2410,6 +2458,33 @@ const HotelAdminDashboard = () => {
                       />
                     </div>
                   </div>
+
+                  {/* Restaurant activation payment confirmation */}
+                  <AlertDialog open={showRestaurantPayDialog} onOpenChange={setShowRestaurantPayDialog}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Activate restaurant</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Enabling the restaurant requires a one-time activation fee of{" "}
+                          <span className="font-semibold text-neutral-900">Nu 5,000</span>. You'll
+                          be taken to the secure payment page to complete it. Once the payment
+                          succeeds, the restaurant is enabled automatically.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={savingHasRestaurant}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => {
+                            e.preventDefault();
+                            proceedToRestaurantPayment();
+                          }}
+                          disabled={savingHasRestaurant}
+                        >
+                          {savingHasRestaurant ? "Starting…" : "Proceed to payment"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
 
                   {/* Account Management Section */}
                   <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
