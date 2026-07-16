@@ -1075,7 +1075,7 @@ const HotelAdminDashboard = () => {
   const handleNavItemClick = (item) => {
     if (item.id === "restaurant") {
       if (hotel?.restaurantEmail) {
-        const loginUrl = `https://zhimpu.dcpl.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`;
+        const loginUrl = `https://restaurant.pos.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`;
         window.open(loginUrl, "_blank", "noopener,noreferrer");
         return;
       }
@@ -2509,7 +2509,7 @@ const HotelAdminDashboard = () => {
                   <button
                     onClick={() =>
                       window.open(
-                        `https://zhimpu.dcpl.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`,
+                        `https://restaurant.pos.bt/login?email=${encodeURIComponent(hotel.restaurantEmail)}`,
                         "_blank",
                         "noopener,noreferrer"
                       )
