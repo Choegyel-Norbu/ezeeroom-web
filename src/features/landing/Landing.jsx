@@ -219,13 +219,13 @@ const Landing = () => {
             contactMeRef.current?.scrollIntoView({ behavior: "smooth" })
           }
         />
-        <PropertyTypeSection />
-        <FeatureSection />
-        <TopHighlightsSection />
         <div ref={listPropertyRef}>
           <ListYourPropertySection onLoginClick={toggleLogin} />
         </div>
-        
+        <FeatureSection />
+        <TopHighlightsSection />
+        <PropertyTypeSection />
+
         <Footer ref={footerRef} />
       </div>
     </>

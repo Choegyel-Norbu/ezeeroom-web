@@ -175,7 +175,7 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
         "Transfer Status": b.transferStatus || "N/A",
         "Payment Method": b.paymentMethod || "N/A",
         "Journal Number": b.journalNumber || "N/A",
-        "Total Price": b.totalPrice,
+        "Total Price": b.txnTotalPrice ?? b.totalPrice,
         Origin: b.origin,
         Destination: b.destination,
         "Hotel Name": b.hotelName,
@@ -398,10 +398,10 @@ const BookingsInventoryTable = ({ hotelId, subscriptionPlan }) => {
                       </div>
                     </TableCell>
 
-                    {/* Price */}
+                    {/* Price — amount the guest actually pays (room - discount + GST/service charge) */}
                     <TableCell className="px-4 py-3">
                       <span className="text-[13px] font-semibold text-neutral-950 tabular-nums whitespace-nowrap">
-                        {formatCurrency(booking.totalPrice)}
+                        {formatCurrency(booking.txnTotalPrice ?? booking.totalPrice)}
                       </span>
                     </TableCell>
 
