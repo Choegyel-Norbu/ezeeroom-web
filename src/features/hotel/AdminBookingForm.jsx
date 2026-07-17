@@ -60,6 +60,7 @@ export default function AdminBookingForm({
     checkInTime: "",
     bookHour: 1,
     guests: 1,
+    mealPlanType: "EP",
     phone: "",
     guestName: "",
     cid: "",
@@ -505,13 +506,22 @@ export default function AdminBookingForm({
     return availableRooms.find(room => room.roomNumber === bookingDetails.roomNumber);
   };
 
+  // Absolute per-night rate for the chosen plan. EP resolves to the room's base
+  // price; CP/MAP/AP resolve to their configured absolute rate.
+  const getMealPlanRate = (room, planType) => {
+    if (!room) return 0;
+    if (!planType || planType === "EP") return room.price;
+    const plan = room.mealPlans?.find((mp) => mp.planType === planType);
+    return plan?.price ?? room.price;
+  };
+
   // Rounding matches the backend's PriceCalculationService (RoundingMode.HALF_UP to
   // 2 decimal places) so the preview shown here matches what's actually charged.
   const calculateTotalPrice = () => {
     const days = calculateDays();
     const selectedRoom = getSelectedRoom();
     if (!selectedRoom) return 0;
-    return round2(days * selectedRoom.price);
+    return round2(days * getMealPlanRate(selectedRoom, bookingDetails.mealPlanType));
   };
 
   const calculateGst = () => {
@@ -916,8 +926,11 @@ export default function AdminBookingForm({
 
   // Handle room selection change to fetch booked dates
   const handleRoomSelect = (roomNumber) => {
-    setBookingDetails(prev => ({ ...prev, roomNumber }));
-    
+    // Reset the meal plan to EP - the newly selected room may not offer the
+    // previously chosen plan.
+    setBookingDetails(prev => ({ ...prev, roomNumber, mealPlanType: "EP" }));
+    setTimeBasedDetails(prev => ({ ...prev, mealPlanType: "EP" }));
+
     // Find the selected room and fetch its booked dates
     const selectedRoom = availableRooms.find(room => room.roomNumber === roomNumber);
     if (selectedRoom && selectedRoom.id) {
@@ -1024,6 +1037,7 @@ export default function AdminBookingForm({
             checkInTime: "",
             bookHour: 1,
             guests: 1,
+            mealPlanType: "EP",
             phone: "",
             guestName: "",
             cid: "",
@@ -1603,6 +1617,35 @@ export default function AdminBookingForm({
                     </p>
                   )}
                 </div>
+
+                {selectedRoom?.mealPlans?.length > 0 && (
+                  <div className="grid gap-2" data-field="mealPlanType">
+                    <Label htmlFor="mealPlanType" className="text-sm">Meal Plan</Label>
+                    <Select
+                      name="mealPlanType"
+                      value={isTimeBasedBooking ? timeBasedDetails.mealPlanType : bookingDetails.mealPlanType}
+                      onValueChange={(value) => {
+                        if (isTimeBasedBooking) {
+                          setTimeBasedDetails((prev) => ({ ...prev, mealPlanType: value }));
+                        } else {
+                          setBookingDetails((prev) => ({ ...prev, mealPlanType: value }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-10 text-sm">
+                        <SelectValue placeholder="Select meal plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EP">EP — Room Only (Nu {selectedRoom.price}/night)</SelectItem>
+                        {selectedRoom.mealPlans.map((mp) => (
+                          <SelectItem key={mp.planType} value={mp.planType}>
+                            {mp.planType} (Nu {mp.price}/night)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <AdditionalGuestFields
                   guests={isTimeBasedBooking ? timeBasedDetails.guests : bookingDetails.guests}

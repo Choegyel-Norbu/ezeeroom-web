@@ -251,6 +251,7 @@ export default function TimeBasedBookingDialog({
         bookHour: bookingDetails.bookHours,
         guests: bookingDetails.guests,
         numberOfRooms: 1,
+        mealPlanType: bookingDetails.mealPlanType,
         // ❌ REMOVED: totalPrice and txnTotalPrice
         // These will be recalculated server-side from database
         // Old code (vulnerable to tampering):
@@ -829,6 +830,29 @@ export default function TimeBasedBookingDialog({
                     </p>
                   )}
                 </div>
+
+                {room.mealPlans?.length > 0 && (
+                  <div className="grid gap-2" data-field="mealPlanType">
+                    <Label htmlFor="mealPlanType" className="text-sm">Meal Plan</Label>
+                    <Select
+                      name="mealPlanType"
+                      value={bookingDetails.mealPlanType}
+                      onValueChange={(value) => setBookingDetails((prev) => ({ ...prev, mealPlanType: value }))}
+                    >
+                      <SelectTrigger className="w-full h-10 text-sm">
+                        <SelectValue placeholder="Select meal plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EP">EP — Room Only (Nu {room.price}/night)</SelectItem>
+                        {room.mealPlans.map((mp) => (
+                          <SelectItem key={mp.planType} value={mp.planType}>
+                            {mp.planType} (Nu {mp.price}/night)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <AdditionalGuestFields
                   guests={bookingDetails.guests}

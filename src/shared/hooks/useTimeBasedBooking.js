@@ -17,6 +17,7 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
     bookHours: 1,
     guests: 1,
     numberOfRooms: 1,
+    mealPlanType: "EP",
     phone: "",
     cid: "",
     passportNumber: "",
@@ -149,10 +150,17 @@ export const useTimeBasedBooking = (room, timeBasedBookings = [], bookedDates = 
 
   // Calculate total price for hourly booking (base price without tax)
   // Kept to exactly 2 decimal places to match the backend's price calculation.
+  // EP resolves to the room's base price; other plans use their absolute rate.
   const calculateTotalPrice = useCallback(() => {
     if (!room?.price) return 0;
-    return round2(room.price * bookingDetails.numberOfRooms);
-  }, [room?.price, bookingDetails.numberOfRooms]);
+    const planType = bookingDetails.mealPlanType;
+    let rate = room.price;
+    if (planType && planType !== "EP") {
+      const plan = room.mealPlans?.find((mp) => mp.planType === planType);
+      rate = plan?.price ?? room.price;
+    }
+    return round2(rate * bookingDetails.numberOfRooms);
+  }, [room?.price, room?.mealPlans, bookingDetails.numberOfRooms, bookingDetails.mealPlanType]);
 
   // Calculate GST amount (5% of base price), only when the hotel has GST enabled
   const calculateGst = useCallback(() => {

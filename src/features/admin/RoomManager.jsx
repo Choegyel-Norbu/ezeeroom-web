@@ -105,9 +105,10 @@ const bedTypeLabels = {
   KING: "King", BUNK: "Bunk", SOFA_BED: "Sofa Bed",
 };
 
-const mealPlanOptions = ["EP", "CP", "MAP", "AP"];
+// EP (Room Only) is the room's base price, not a configurable plan row.
+// Owners set an absolute per-night rate for the meal-inclusive plans below.
+const mealPlanOptions = ["CP", "MAP", "AP"];
 const mealPlanLabels = {
-  EP: "EP — Room Only",
   CP: "CP — Continental Plan (+ breakfast)",
   MAP: "MAP — Modified American Plan (+ breakfast & 1 meal)",
   AP: "AP — American Plan (+ all meals)",
@@ -124,6 +125,8 @@ const RoomManager = ({ hotelId }) => {
   const [deletionDialogOpen, setDeletionDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete]       = useState(null);
   const formRef = useRef(null);
+  const lastMealPlanRowRef = useRef(null);
+  const justAddedMealPlanRef = useRef(false);
 
   const [roomForm, setRoomForm] = useState({
     roomTypeId: "", price: "", roomNumber: "", maxGuests: "",
@@ -202,7 +205,7 @@ const RoomManager = ({ hotelId }) => {
           images:      roomToEdit.imageUrl?.map((url, index) => ({ url, name: `existing-${index}`, isExisting: true })) || [],
           amenities:   roomToEdit.amenities?.map((name) => standardAmenities.find((a) => a.name === name) || { name, id: Date.now() }) || [],
           bedConfigurations: roomToEdit.bedConfigurations?.map((bc) => ({ bedType: bc.bedType, quantity: bc.quantity })) || [],
-          mealPlans:   roomToEdit.mealPlans?.map((mp) => ({ planType: mp.planType, priceAdjustment: mp.priceAdjustment })) || [],
+          mealPlans:   roomToEdit.mealPlans?.map((mp) => ({ planType: mp.planType, price: mp.price })) || [],
         });
       }
     } else if (showForm) {
@@ -217,6 +220,15 @@ const RoomManager = ({ hotelId }) => {
     });
     setErrors({});
   };
+
+  // Scroll the newly added meal plan row into view - only for rows added via
+  // the "Add meal plan" button, not when an existing room's plans first load.
+  useEffect(() => {
+    if (justAddedMealPlanRef.current) {
+      justAddedMealPlanRef.current = false;
+      lastMealPlanRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [roomForm.mealPlans]);
 
   const totalBedCapacity = roomForm.bedConfigurations.reduce(
     (sum, bc) => sum + (bedTypeCapacity[bc.bedType] || 0) * (Number(bc.quantity) || 0), 0
@@ -241,7 +253,8 @@ const RoomManager = ({ hotelId }) => {
   const addMealPlanRow = () => {
     const nextPlan = mealPlanOptions.find((p) => !roomForm.mealPlans.some((mp) => mp.planType === p));
     if (!nextPlan) return;
-    setRoomForm((prev) => ({ ...prev, mealPlans: [...prev.mealPlans, { planType: nextPlan, priceAdjustment: 0 }] }));
+    justAddedMealPlanRef.current = true;
+    setRoomForm((prev) => ({ ...prev, mealPlans: [...prev.mealPlans, { planType: nextPlan, price: prev.price ? String(prev.price) : "" }] }));
   };
   const updateMealPlanRow = (index, field, value) => {
     setRoomForm((prev) => ({
@@ -328,6 +341,7 @@ const RoomManager = ({ hotelId }) => {
         roomTypeId: Number(roomForm.roomTypeId),
         imageUrl: [...existingImageUrls, ...newImageUrls],
         amenities: roomForm.amenities.map((a) => a.name),
+        mealPlans: roomForm.mealPlans.map((mp) => ({ ...mp, price: Number(mp.price) || 0 })),
       };
       if (editingRoom) {
         const response = await api.put(`/rooms/${editingRoom}`, payload);
@@ -645,12 +659,13 @@ const RoomManager = ({ hotelId }) => {
                 )}
 
                 {roomForm.mealPlans.map((row, index) => {
-                  const totalPrice = (Number(roomForm.price) || 0) + (Number(row.priceAdjustment) || 0);
+                  const planRate = Number(row.price) || 0;
+                  const isLastRow = index === roomForm.mealPlans.length - 1;
                   return (
-                    <div key={index} className="space-y-1">
+                    <div key={index} ref={isLastRow ? lastMealPlanRowRef : null} className="space-y-1">
                       <div className="flex items-center gap-2">
                         <Select value={row.planType} onValueChange={(v) => updateMealPlanRow(index, "planType", v)}>
-                          <SelectTrigger className="h-9 flex-1 text-[13px] border-neutral-200 bg-neutral-50 shadow-none">
+                          <SelectTrigger className="h-9 flex-1 min-w-0 text-[13px] border-neutral-200 bg-neutral-50 shadow-none [&>span]:truncate">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -662,11 +677,11 @@ const RoomManager = ({ hotelId }) => {
                           </SelectContent>
                         </Select>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <span className="text-[12px] text-neutral-400">+Nu.</span>
+                          <span className="text-[12px] text-neutral-400">Nu.</span>
                           <input
-                            type="number" min="0" step="1"
-                            value={row.priceAdjustment}
-                            onChange={(e) => updateMealPlanRow(index, "priceAdjustment", Number(e.target.value))}
+                            type="number" min="1" step="1"
+                            value={row.price}
+                            onChange={(e) => updateMealPlanRow(index, "price", e.target.value)}
                             className="w-20 h-9 rounded-md border border-neutral-200 px-2.5 text-[13px] text-neutral-900 bg-neutral-50 outline-none focus:border-neutral-400 transition-colors tabular-nums"
                           />
                           <span className="text-[12px] text-neutral-400">/night</span>
@@ -680,7 +695,7 @@ const RoomManager = ({ hotelId }) => {
                         </button>
                       </div>
                       <p className="text-[11px] text-neutral-400 pl-0.5">
-                        Total room price with {row.planType}: <span className="font-medium text-neutral-600 tabular-nums">Nu. {totalPrice.toFixed(2)}</span> / night
+                        Room price with {row.planType}: <span className="font-medium text-neutral-600 tabular-nums">Nu. {planRate.toFixed(2)}</span> / night
                       </p>
                     </div>
                   );

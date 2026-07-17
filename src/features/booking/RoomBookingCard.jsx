@@ -64,6 +64,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     destination: "",
     origin: "",
     guests: 1,
+    mealPlanType: "EP",
     isBhutanese: true,
     additionalGuests: [],
   });
@@ -244,19 +245,19 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
     return daysDiff > 0 ? daysDiff : 0;
   };
 
-  // EP (Room Only) is always available at zero adjustment; other plans only
-  // exist if the hotel configured them on the room.
-  const getMealPlanAdjustment = (planType) => {
-    if (!planType || planType === "EP") return 0;
+  // EP (Room Only) is always the room's base price; other plans carry their own
+  // absolute per-night rate and only exist if the hotel configured them.
+  const getMealPlanRate = (planType) => {
+    if (!planType || planType === "EP") return room.price;
     const plan = room.mealPlans?.find((mp) => mp.planType === planType);
-    return plan?.priceAdjustment || 0;
+    return plan?.price ?? room.price;
   };
 
   // Rounding matches the backend's PriceCalculationService (RoundingMode.HALF_UP to
   // 2 decimal places) so the preview shown here matches what's actually charged.
   const calculateTotalPrice = () => {
     const days = calculateDays();
-    const nightlyRate = room.price + getMealPlanAdjustment(bookingDetails.mealPlanType);
+    const nightlyRate = getMealPlanRate(bookingDetails.mealPlanType);
     const basePrice = days * nightlyRate * bookingDetails.numberOfRooms;
     return round2(basePrice); // Just the base price without tax
   };
@@ -276,7 +277,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
 
   const calculateBasePrice = () => {
     const days = calculateDays();
-    const nightlyRate = room.price + getMealPlanAdjustment(bookingDetails.mealPlanType);
+    const nightlyRate = getMealPlanRate(bookingDetails.mealPlanType);
     return days * nightlyRate * bookingDetails.numberOfRooms;
   };
 
@@ -951,6 +952,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
         checkOutDate: checkOutDate,
         guests: immediateBookingDetails.guests,
         numberOfRooms: 1,
+        mealPlanType: immediateBookingDetails.mealPlanType,
         // ❌ REMOVED: totalPrice and txnTotalPrice
         // Backend recalculates these from database to prevent price manipulation
         // Old code (vulnerable):
@@ -1008,6 +1010,7 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
           destination: "",
           origin: "",
           guests: 1,
+          mealPlanType: "EP",
           isBhutanese: true,
           additionalGuests: [],
         });
@@ -1676,10 +1679,10 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                         <SelectValue placeholder="Select meal plan" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="EP">EP — Room Only (+Nu 0)</SelectItem>
+                        <SelectItem value="EP">EP — Room Only (Nu {room.price}/night)</SelectItem>
                         {room.mealPlans.map((mp) => (
                           <SelectItem key={mp.planType} value={mp.planType}>
-                            {mp.planType} (+Nu {mp.priceAdjustment}/night)
+                            {mp.planType} (Nu {mp.price}/night)
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1713,13 +1716,13 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     Nu {room.price.toFixed(2)}
                   </span>
                 </div>
-                {bookingDetails.mealPlanType !== "EP" && getMealPlanAdjustment(bookingDetails.mealPlanType) > 0 && (
+                {bookingDetails.mealPlanType !== "EP" && (getMealPlanRate(bookingDetails.mealPlanType) - room.price) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
                       Meal Plan ({bookingDetails.mealPlanType}) / night
                     </span>
                     <span className="font-medium">
-                      +Nu {getMealPlanAdjustment(bookingDetails.mealPlanType).toFixed(2)}
+                      +Nu {(getMealPlanRate(bookingDetails.mealPlanType) - room.price).toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -2127,6 +2130,29 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                 )}
               </div>
 
+              {room.mealPlans?.length > 0 && (
+                <div className="grid gap-2" data-field="mealPlanType">
+                  <Label htmlFor="immediateMealPlanType" className="text-sm">Meal Plan</Label>
+                  <Select
+                    name="mealPlanType"
+                    value={immediateBookingDetails.mealPlanType}
+                    onValueChange={(value) => setImmediateBookingDetails((prev) => ({ ...prev, mealPlanType: value }))}
+                  >
+                    <SelectTrigger className="w-full h-10 text-sm">
+                      <SelectValue placeholder="Select meal plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EP">EP — Room Only (Nu {room.price}/night)</SelectItem>
+                      {room.mealPlans.map((mp) => (
+                        <SelectItem key={mp.planType} value={mp.planType}>
+                          {mp.planType} (Nu {mp.price}/night)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <AdditionalGuestFields
                 guests={immediateBookingDetails.guests}
                 additionalGuests={immediateBookingDetails.additionalGuests}
@@ -2175,8 +2201,18 @@ export default function RoomBookingCard({ room, hotelId, hotel }) {
                     <span className="text-muted-foreground">Price per night</span>
                     <span className="font-medium">Nu {room.price.toFixed(2)}</span>
                   </div>
+                  {immediateBookingDetails.mealPlanType !== "EP" && (getMealPlanRate(immediateBookingDetails.mealPlanType) - room.price) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Meal Plan ({immediateBookingDetails.mealPlanType}) / night
+                      </span>
+                      <span className="font-medium">
+                        +Nu {(getMealPlanRate(immediateBookingDetails.mealPlanType) - room.price).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   {(() => {
-                    const basePrice = round2(room.price);
+                    const basePrice = round2(getMealPlanRate(immediateBookingDetails.mealPlanType));
                     const gstAmount = room.gst ? round2(basePrice * 0.05) : 0;
                     const serviceTaxAmount = round2(basePrice * 0.03);
                     const txnTotalPrice = round2(basePrice + gstAmount + serviceTaxAmount);
