@@ -115,7 +115,14 @@ const buildReceiptHtml = (booking, receiptData) => {
     ? `${escapeHtml(booking.checkOutDate)}${booking.timeBased && booking.checkOutTime ? ` · ${formatTime(booking.checkOutTime)}` : ''}`
     : 'N/A';
 
-  const paymentMethodLabel = booking.paymentMethod === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Cash';
+  // paymentMethod (CASH / BANK_TRANSFER) is only set for walk-in/admin bookings
+  // where staff collect payment directly. Online bookings leave it null and are
+  // paid through the payment gateway, so they should read "Online".
+  const paymentMethodLabel = booking.paymentMethod === 'BANK_TRANSFER'
+    ? 'Bank Transfer'
+    : booking.paymentMethod === 'CASH'
+      ? 'Cash'
+      : 'Online';
   const journalLine = booking.paymentMethod === 'BANK_TRANSFER' && booking.journalNumber
     ? `Jr no: ${escapeHtml(booking.journalNumber)}` : '';
 
