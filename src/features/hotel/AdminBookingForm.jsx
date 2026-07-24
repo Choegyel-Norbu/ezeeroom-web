@@ -775,12 +775,7 @@ export default function AdminBookingForm({
     }
 
     const validateBhutanesePhone = (phone) => {
-      const cleanPhone = phone.replace(/[\s\-\(\)]/g, "");
-      if (!cleanPhone) return "Phone number is required";
-      if (!/^\d+$/.test(cleanPhone)) return "Phone number should contain only digits";
-      if (cleanPhone.length !== 8) return "Phone number must be exactly 8 digits";
-      const mobilePattern = /^(16|17|77)\d{6}$/;
-      if (!mobilePattern.test(cleanPhone)) return "Invalid Bhutanese mobile number. Must start with 16, 17, or 77.";
+      if (!phone.trim()) return "Phone number is required";
       return null;
     };
 
